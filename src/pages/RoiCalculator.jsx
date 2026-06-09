@@ -36,8 +36,6 @@ export default function RoiCalculator() {
   const [form, setForm] = useState(INITIAL_FORM)
   const [errors, setErrors] = useState({})
   const [results, setResults] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [apiError, setApiError] = useState(null)
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -45,7 +43,7 @@ export default function RoiCalculator() {
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: undefined }))
   }
 
-  async function handleSubmit(e) {
+  function handleSubmit(e) {
     e.preventDefault()
     const validationErrors = validate(form)
     if (Object.keys(validationErrors).length > 0) {
@@ -53,27 +51,16 @@ export default function RoiCalculator() {
       return
     }
 
-    setLoading(true)
-    setApiError(null)
-    setResults(null)
-
-    try {
-      const payload = {
-        businessType: form.businessType,
-        numberOfOutlets: Number(form.outletCount),
-        dailyTransactions: Number(form.dailyTransactions),
-        transactionValue: Number(form.transactionValue),
-        currentCost: Number(form.currentCosts),
-        staffCount: Number(form.staffCount),
-        hoursPerDay: Number(form.manualHoursPerDay),
-      }
-      const data = await calculateRoi(payload)
-      setResults(data)
-    } catch (err) {
-      setApiError(err.message || 'Failed to connect to the server. Please try again.')
-    } finally {
-      setLoading(false)
+    const payload = {
+      businessType: form.businessType,
+      numberOfOutlets: Number(form.outletCount),
+      dailyTransactions: Number(form.dailyTransactions),
+      transactionValue: Number(form.transactionValue),
+      currentCost: Number(form.currentCosts),
+      staffCount: Number(form.staffCount),
+      hoursPerDay: Number(form.manualHoursPerDay),
     }
+    setResults(calculateRoi(payload))
   }
 
   function handleReset() {
@@ -246,31 +233,12 @@ export default function RoiCalculator() {
                   </div>
                 </div>
 
-                {apiError && (
-                  <div className="roi-api-error">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/>
-                      <path d="M8 5v3.5M8 11h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
-                    {apiError}
-                  </div>
-                )}
-
                 <div className="roi-form-actions">
-                  <button type="submit" className="roi-calc-btn" disabled={loading}>
-                    {loading ? (
-                      <>
-                        <span className="roi-spinner" />
-                        Calculating...
-                      </>
-                    ) : (
-                      <>
-                        Calculate My Savings
-                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                          <path d="M3.75 9h10.5M9.75 4.5l4.5 4.5-4.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </>
-                    )}
+                  <button type="submit" className="roi-calc-btn">
+                    Calculate My Savings
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                      <path d="M3.75 9h10.5M9.75 4.5l4.5 4.5-4.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                   </button>
                   {results && (
                     <button type="button" className="roi-reset-btn" onClick={handleReset}>
@@ -296,14 +264,7 @@ export default function RoiCalculator() {
                 </div>
               )}
 
-              {loading && (
-                <div className="roi-results-loading">
-                  <div className="loading-ring" />
-                  <p>Calculating your savings...</p>
-                </div>
-              )}
-
-              {results && !loading && (
+              {results && (
                 <div className="roi-results-content">
                   <div className="roi-results-header">
                     <span className="results-badge">Your Savings Estimate</span>
