@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\",\"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\",\"User\"\\); git config --global user.name \"Kenny Choy\"; git config --global user.email \"sales@smartouch.com.my\"; git config --global user.name; git config --global user.email)"
+    ]
+  }
+}
