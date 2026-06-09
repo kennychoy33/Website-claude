@@ -48,6 +48,7 @@ export default function Navbar() {
             <NavLink to="/products" onClick={closeMenu}>Products</NavLink>
             <NavLink to="/about" onClick={closeMenu}>About</NavLink>
             <NavLink to="/contact" onClick={closeMenu}>Contact</NavLink>
+            <NavLink to="/roi" className="nav-roi" onClick={closeMenu}>ROI Calculator</NavLink>
             <Link to="/contact" className="nav-cta" onClick={closeMenu}>
               Get a Demo
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

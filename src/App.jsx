@@ -6,6 +6,7 @@ import Home from './pages/Home'
 import Products from './pages/Products'
 import About from './pages/About'
 import Contact from './pages/Contact'
+import RoiCalculator from './pages/RoiCalculator'
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/products" element={<Products />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/roi" element={<RoiCalculator />} />
         </Routes>
       </main>
       <Footer />

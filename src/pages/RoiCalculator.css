@@ -1,0 +1,660 @@
+/* ── Hero ─────────────────────────────────────────────────────────── */
+.roi-hero {
+  background: linear-gradient(135deg, var(--primary) 0%, #162d61 60%, #0f1e42 100%);
+  padding: 80px 0 64px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.roi-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 80% at 20% 50%, rgba(245, 158, 11, 0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 60% at 80% 30%, rgba(37, 99, 235, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.roi-hero-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 6px 16px;
+  border-radius: 100px;
+  margin-bottom: 20px;
+}
+
+.roi-hero-title {
+  font-size: clamp(28px, 4.5vw, 48px);
+  font-weight: 800;
+  color: var(--white);
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  margin-bottom: 20px;
+}
+
+.roi-hero-title span {
+  color: var(--gold);
+}
+
+.roi-hero-subtitle {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.72);
+  max-width: 520px;
+  margin: 0 auto;
+  line-height: 1.75;
+}
+
+/* ── Calculator layout ───────────────────────────────────────────── */
+.roi-calculator {
+  background: var(--bg-light);
+}
+
+.roi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+/* ── Form panel ──────────────────────────────────────────────────── */
+.roi-form-panel {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 36px;
+  box-shadow: var(--shadow-md);
+}
+
+.roi-panel-header {
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.roi-panel-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 4px;
+}
+
+.roi-panel-header p {
+  font-size: 14px;
+  color: var(--text-light);
+}
+
+/* ── Fields ──────────────────────────────────────────────────────── */
+.roi-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.roi-field {
+  margin-bottom: 20px;
+}
+
+.roi-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 7px;
+}
+
+.roi-input-wrapper,
+.roi-select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.roi-input-wrapper input,
+.roi-select-wrapper select {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-dark);
+  background: var(--white);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.roi-input-wrapper input:focus,
+.roi-select-wrapper select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(30, 58, 123, 0.1);
+}
+
+.roi-field.error .roi-input-wrapper input,
+.roi-field.error .roi-select-wrapper select {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.08);
+}
+
+/* Select chevron */
+.roi-select-wrapper select {
+  padding-right: 38px;
+  cursor: pointer;
+}
+
+.select-chevron {
+  position: absolute;
+  right: 12px;
+  color: var(--text-light);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+/* Prefix / suffix inputs */
+.roi-input-wrapper.prefix input {
+  padding-left: 44px;
+}
+
+.roi-input-wrapper.suffix input {
+  padding-right: 44px;
+}
+
+.input-prefix {
+  position: absolute;
+  left: 0;
+  width: 40px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-mid);
+  border-right: 1.5px solid var(--border);
+  background: var(--bg-gray);
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  pointer-events: none;
+}
+
+.input-suffix {
+  position: absolute;
+  right: 0;
+  width: 40px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-mid);
+  border-left: 1.5px solid var(--border);
+  background: var(--bg-gray);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  pointer-events: none;
+}
+
+/* Error message */
+.roi-error-msg {
+  display: block;
+  font-size: 12px;
+  color: #ef4444;
+  margin-top: 5px;
+  font-weight: 500;
+}
+
+/* API error */
+.roi-api-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 20px;
+}
+
+/* Form actions */
+.roi-form-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.roi-calc-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 50px;
+  background: linear-gradient(135deg, var(--primary) 0%, #2952a3 100%);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  letter-spacing: -0.01em;
+  box-shadow: 0 4px 16px rgba(30, 58, 123, 0.35);
+}
+
+.roi-calc-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(30, 58, 123, 0.45);
+}
+
+.roi-calc-btn:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.roi-reset-btn {
+  height: 50px;
+  padding: 0 20px;
+  background: transparent;
+  color: var(--text-mid);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.roi-reset-btn:hover {
+  border-color: var(--text-mid);
+  color: var(--text-dark);
+}
+
+/* Spinner */
+.roi-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: roi-spin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes roi-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Results panel ───────────────────────────────────────────────── */
+.roi-results-panel {
+  position: sticky;
+  top: 88px;
+}
+
+/* Placeholder */
+.roi-results-placeholder {
+  background: var(--white);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: 64px 32px;
+  text-align: center;
+  color: var(--text-light);
+}
+
+.placeholder-icon {
+  margin: 0 auto 20px;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-gray);
+  border-radius: 50%;
+  color: var(--border);
+}
+
+.roi-results-placeholder h3 {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-mid);
+  margin-bottom: 10px;
+}
+
+.roi-results-placeholder p {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Loading */
+.roi-results-loading {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 80px 32px;
+  text-align: center;
+}
+
+.loading-ring {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--bg-gray);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: roi-spin 0.75s linear infinite;
+  margin: 0 auto 20px;
+}
+
+.roi-results-loading p {
+  color: var(--text-mid);
+  font-size: 15px;
+}
+
+/* Results content */
+.roi-results-content {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  animation: roi-fadein 0.35s ease;
+}
+
+@keyframes roi-fadein {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.roi-results-header {
+  background: linear-gradient(135deg, var(--primary) 0%, #162d61 100%);
+  padding: 28px 32px 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.roi-results-header::after {
+  content: '';
+  position: absolute;
+  right: -20px;
+  top: -20px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.results-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 4px 12px;
+  border-radius: 100px;
+  margin-bottom: 12px;
+}
+
+.roi-results-header h2 {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--white);
+  margin-bottom: 4px;
+}
+
+.roi-results-header p {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Hero metric */
+.roi-hero-metric {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.06) 0%, rgba(245, 158, 11, 0.02) 100%);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.15);
+  padding: 24px 32px;
+  text-align: center;
+}
+
+.hero-metric-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-mid);
+  margin-bottom: 4px;
+}
+
+.hero-metric-value {
+  font-size: clamp(28px, 4vw, 38px);
+  font-weight: 800;
+  color: var(--primary);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.hero-metric-sub {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-top: 4px;
+}
+
+/* Metrics grid */
+.roi-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.roi-metric-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--white);
+  padding: 18px 20px;
+}
+
+.metric-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.metric-icon.monthly  { background: rgba(30, 58, 123, 0.08); color: var(--primary); }
+.metric-icon.roi      { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+.metric-icon.payback  { background: rgba(245, 158, 11, 0.1); color: var(--gold); }
+.metric-icon.cost     { background: rgba(148, 163, 184, 0.12); color: var(--text-mid); }
+
+.metric-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+
+.metric-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-dark);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.metric-value--muted {
+  font-size: 16px;
+  color: var(--text-mid);
+}
+
+.metric-value--muted span {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Breakdown */
+.roi-breakdown {
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--border);
+}
+
+.roi-breakdown h4 {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-mid);
+  margin-bottom: 14px;
+}
+
+.breakdown-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  color: var(--text-mid);
+}
+
+.breakdown-row--divider {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.breakdown-row--total {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.breakdown-value {
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.breakdown-value.positive { color: #10b981; }
+.breakdown-value.negative { color: #ef4444; }
+
+/* CTA block */
+.roi-cta-block {
+  padding: 24px 32px;
+  background: linear-gradient(135deg, var(--primary) 0%, #162d61 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.roi-cta-block p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+  flex: 1;
+}
+
+.roi-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--gold);
+  color: var(--primary);
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.roi-cta-btn:hover {
+  background: #fbbf24;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+}
+
+/* Disclaimer */
+.roi-disclaimer {
+  padding: 14px 32px;
+  font-size: 11px;
+  color: var(--text-light);
+  line-height: 1.6;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .roi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .roi-results-panel {
+    position: static;
+  }
+}
+
+@media (max-width: 600px) {
+  .roi-hero {
+    padding: 60px 0 48px;
+  }
+
+  .roi-form-panel {
+    padding: 24px 20px;
+  }
+
+  .roi-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .roi-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .roi-results-header,
+  .roi-hero-metric,
+  .roi-breakdown {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .roi-cta-block {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+  }
+
+  .roi-cta-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .roi-disclaimer {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}

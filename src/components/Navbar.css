@@ -112,6 +112,32 @@
   background: rgba(37, 99, 235, 0.1);
 }
 
+/* ROI Calculator highlight link */
+.nav-roi {
+  color: var(--gold) !important;
+  font-weight: 600 !important;
+}
+
+.nav-roi:hover {
+  color: var(--gold) !important;
+  background: rgba(245, 158, 11, 0.12) !important;
+}
+
+.nav-roi.active {
+  color: var(--gold) !important;
+  background: rgba(245, 158, 11, 0.12) !important;
+}
+
+.navbar.scrolled .nav-roi {
+  color: #b45309 !important;
+}
+
+.navbar.scrolled .nav-roi:hover,
+.navbar.scrolled .nav-roi.active {
+  color: #b45309 !important;
+  background: rgba(245, 158, 11, 0.1) !important;
+}
+
 /* CTA button */
 .nav-cta {
   display: inline-flex !important;
