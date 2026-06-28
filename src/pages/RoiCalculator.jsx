@@ -67,7 +67,6 @@ export default function RoiCalculator() {
     setForm(INITIAL_FORM)
     setErrors({})
     setResults(null)
-    setApiError(null)
   }
 
   return (
@@ -251,7 +250,7 @@ export default function RoiCalculator() {
 
             {/* Results Panel */}
             <div className="roi-results-panel">
-              {!results && !loading && (
+              {!results && (
                 <div className="roi-results-placeholder">
                   <div className="placeholder-icon">
                     <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
@@ -269,7 +268,7 @@ export default function RoiCalculator() {
                   <div className="roi-results-header">
                     <span className="results-badge">Your Savings Estimate</span>
                     <h2>Here's Your ROI</h2>
-                    <p>Based on your {form.outletCount} {Number(form.outletCount) === 1 ? 'outlet' : 'outlets'} · {form.businessType}</p>
+                    <p>Based on your {form.outletCount} {Number(form.outletCount) === 1 ? 'outlet' : 'outlets'} - {form.businessType}</p>
                   </div>
 
                   {/* Hero metric */}
@@ -351,7 +350,7 @@ export default function RoiCalculator() {
                       </div>
                       <div className="breakdown-row breakdown-row--divider">
                         <span>Smartouch Subscription</span>
-                        <span className="breakdown-value negative">−{formatRM(results.smartouchCost)}</span>
+                        <span className="breakdown-value negative">-{formatRM(results.smartouchCost)}</span>
                       </div>
                       <div className="breakdown-row breakdown-row--total">
                         <span>Net Monthly Savings</span>
