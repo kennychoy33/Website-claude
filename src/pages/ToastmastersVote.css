@@ -14,6 +14,15 @@
   color: var(--tm-ink);
 }
 
+.tm-page.public {
+  display: block;
+}
+
+.tm-page.public .tm-content {
+  display: grid;
+  place-items: start center;
+}
+
 .tm-sidebar {
   min-height: 100vh;
   background: linear-gradient(180deg, #042746, #07345f);
@@ -395,6 +404,7 @@
 
 .tm-vote-shell {
   max-width: 760px;
+  width: 100%;
   margin: 0 auto;
 }
 
@@ -642,6 +652,10 @@
 @media (max-width: 980px) {
   .tm-page {
     grid-template-columns: 1fr;
+  }
+
+  .tm-page.public .tm-content {
+    padding: 14px;
   }
 
   .tm-sidebar {

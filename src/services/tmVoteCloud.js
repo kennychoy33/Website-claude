@@ -12,7 +12,7 @@ const supabase = isCloudConfigured ? createClient(supabaseUrl, supabaseAnonKey) 
 
 export function getPublicVoteUrl() {
   const basePath = import.meta.env.BASE_URL || '/'
-  return new URL(`${basePath.replace(/\/$/, '')}/tm-vote`, window.location.origin).toString()
+  return new URL(`${basePath.replace(/\/$/, '')}/tm-vote?view=vote`, window.location.origin).toString()
 }
 
 export const seedState = {

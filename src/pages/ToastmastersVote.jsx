@@ -525,7 +525,8 @@ function HistoryView({ data, t }) {
 
 export default function ToastmastersVote() {
   const [data, setData] = useState(null)
-  const [view, setView] = useState('admin')
+  const publicView = new URLSearchParams(window.location.search).get('view') === 'vote'
+  const [view, setView] = useState(publicView ? 'vote' : 'admin')
   const [lang, setLang] = useState(() => localStorage.getItem('tm-vote-lang') || 'zh')
   const [source, setSource] = useState(isCloudConfigured ? 'cloud' : 'local')
   const [syncStatus, setSyncStatus] = useState('')
@@ -580,11 +581,11 @@ export default function ToastmastersVote() {
 
   if (!data) {
     return (
-      <div className="tm-page">
-        <aside className="tm-sidebar">
+      <div className={`tm-page ${publicView ? 'public' : ''}`}>
+        {!publicView && <aside className="tm-sidebar">
           <div className="tm-brand">TM Vote</div>
           <LanguageToggle lang={lang} setLang={changeLang} t={t} />
-        </aside>
+        </aside>}
         <main className="tm-content">
           <div className="tm-success-card"><h2>{t.syncing}</h2></div>
         </main>
@@ -593,14 +594,14 @@ export default function ToastmastersVote() {
   }
 
   return (
-    <div className="tm-page">
-      <aside className="tm-sidebar">
+    <div className={`tm-page ${publicView ? 'public' : ''}`}>
+      {!publicView && <aside className="tm-sidebar">
         <div className="tm-brand">TM Vote</div>
         <LanguageToggle lang={lang} setLang={changeLang} t={t} />
         {nav.map(([key, label]) => (
           <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
         ))}
-      </aside>
+      </aside>}
       <main className="tm-content">
         {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={t} />}
         {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={t} />}
