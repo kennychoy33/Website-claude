@@ -7,6 +7,7 @@ import Products from './pages/Products'
 import About from './pages/About'
 import Contact from './pages/Contact'
 import RoiCalculator from './pages/RoiCalculator'
+import ToastmastersVote from './pages/ToastmastersVote'
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -18,7 +19,18 @@ export default function App() {
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>
       <ScrollToTop />
-      <Navbar />
+      <AppShell />
+    </BrowserRouter>
+  )
+}
+
+function AppShell() {
+  const { pathname } = useLocation()
+  const isToolRoute = pathname.startsWith('/tm-vote')
+
+  return (
+    <>
+      {!isToolRoute && <Navbar />}
       <main>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -26,9 +38,10 @@ export default function App() {
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/roi" element={<RoiCalculator />} />
+          <Route path="/tm-vote" element={<ToastmastersVote />} />
         </Routes>
       </main>
-      <Footer />
-    </BrowserRouter>
+      {!isToolRoute && <Footer />}
+    </>
   )
 }

@@ -1,0 +1,156 @@
+create table if not exists public.tm_meetings (
+  id text primary key,
+  meeting_number text not null,
+  meeting_date text not null,
+  theme text not null,
+  word_of_day text,
+  close_time text,
+  status text not null default 'draft',
+  public_link text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.tm_candidates (
+  id text primary key,
+  meeting_id text not null references public.tm_meetings(id) on delete cascade,
+  category text not null check (category in ('prepared', 'impromptu')),
+  name text not null default '',
+  speech_title text,
+  project text,
+  votes integer not null default 0,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.tm_votes (
+  id uuid primary key default gen_random_uuid(),
+  meeting_id text not null references public.tm_meetings(id) on delete cascade,
+  voter_token text not null,
+  prepared_candidate_id text not null references public.tm_candidates(id) on delete cascade,
+  impromptu_candidate_id text not null references public.tm_candidates(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (meeting_id, voter_token)
+);
+
+create table if not exists public.tm_winner_history (
+  id uuid primary key default gen_random_uuid(),
+  meeting_number text not null,
+  meeting_date text not null,
+  prepared_winner text,
+  prepared_votes integer not null default 0,
+  impromptu_winner text,
+  impromptu_votes integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create or replace function public.tm_submit_vote(
+  p_meeting_id text,
+  p_prepared_candidate_id text,
+  p_impromptu_candidate_id text,
+  p_voter_token text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if exists (
+    select 1
+    from public.tm_votes
+    where meeting_id = p_meeting_id
+      and voter_token = p_voter_token
+  ) then
+    return jsonb_build_object('already_voted', true);
+  end if;
+
+  insert into public.tm_votes (
+    meeting_id,
+    voter_token,
+    prepared_candidate_id,
+    impromptu_candidate_id
+  )
+  values (
+    p_meeting_id,
+    p_voter_token,
+    p_prepared_candidate_id,
+    p_impromptu_candidate_id
+  );
+
+  update public.tm_candidates
+  set votes = votes + 1
+  where id in (p_prepared_candidate_id, p_impromptu_candidate_id)
+    and meeting_id = p_meeting_id;
+
+  return jsonb_build_object('already_voted', false);
+end;
+$$;
+
+alter table public.tm_meetings enable row level security;
+alter table public.tm_candidates enable row level security;
+alter table public.tm_votes enable row level security;
+alter table public.tm_winner_history enable row level security;
+
+drop policy if exists "tm meetings public read" on public.tm_meetings;
+drop policy if exists "tm meetings public write" on public.tm_meetings;
+drop policy if exists "tm meetings public update" on public.tm_meetings;
+drop policy if exists "tm candidates public read" on public.tm_candidates;
+drop policy if exists "tm candidates public write" on public.tm_candidates;
+drop policy if exists "tm candidates public update" on public.tm_candidates;
+drop policy if exists "tm candidates public delete" on public.tm_candidates;
+drop policy if exists "tm votes public insert" on public.tm_votes;
+drop policy if exists "tm history public read" on public.tm_winner_history;
+drop policy if exists "tm history public write" on public.tm_winner_history;
+
+create policy "tm meetings public read"
+on public.tm_meetings for select
+to anon
+using (true);
+
+create policy "tm meetings public write"
+on public.tm_meetings for insert
+to anon
+with check (true);
+
+create policy "tm meetings public update"
+on public.tm_meetings for update
+to anon
+using (true)
+with check (true);
+
+create policy "tm candidates public read"
+on public.tm_candidates for select
+to anon
+using (true);
+
+create policy "tm candidates public write"
+on public.tm_candidates for insert
+to anon
+with check (true);
+
+create policy "tm candidates public update"
+on public.tm_candidates for update
+to anon
+using (true)
+with check (true);
+
+create policy "tm candidates public delete"
+on public.tm_candidates for delete
+to anon
+using (true);
+
+create policy "tm votes public insert"
+on public.tm_votes for insert
+to anon
+with check (true);
+
+create policy "tm history public read"
+on public.tm_winner_history for select
+to anon
+using (true);
+
+create policy "tm history public write"
+on public.tm_winner_history for insert
+to anon
+with check (true);
