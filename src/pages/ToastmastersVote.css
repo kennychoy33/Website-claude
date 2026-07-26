@@ -553,9 +553,13 @@
 .tm-poster-items,
 .tm-poster-meta {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   margin-top: 18px;
+}
+
+.tm-poster-meta {
+  grid-template-columns: 1fr 1fr;
 }
 
 .tm-poster-items strong {
@@ -586,7 +590,7 @@
 
 .tm-winner-row {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 
@@ -649,6 +653,95 @@
   text-align: center;
 }
 
+.tm-login-page {
+  --tm-navy: #092f57;
+  --tm-burgundy: #9b1238;
+  --tm-gold-soft: #fff4dd;
+  --tm-muted: #65758b;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(200,145,42,.18), transparent 28%),
+    linear-gradient(135deg, #061f39, #092f57 55%, #190713);
+  padding: 24px;
+}
+
+.tm-login-card {
+  width: min(460px, 100%);
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(0,0,0,.25);
+  padding: 30px;
+}
+
+.tm-login-brand {
+  color: var(--tm-navy);
+  margin: 0 0 14px;
+}
+
+.tm-login-card h1 {
+  color: var(--tm-navy);
+  font-size: 32px;
+  margin: 18px 0 8px;
+}
+
+.tm-login-card p {
+  color: var(--tm-muted);
+  font-weight: 800;
+}
+
+.tm-login-note {
+  background: var(--tm-gold-soft);
+  border: 1px solid #e2c27c;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.tm-login-card label {
+  display: block;
+  margin-top: 14px;
+}
+
+.tm-login-card label span {
+  display: block;
+  color: var(--tm-muted);
+  font-size: 13px;
+  font-weight: 900;
+  margin-bottom: 7px;
+}
+
+.tm-login-card input {
+  width: 100%;
+  border: 1px solid #cdd8e8;
+  border-radius: 8px;
+  padding: 13px;
+  font: inherit;
+  font-weight: 800;
+}
+
+.tm-login-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.tm-login-actions button {
+  border: 1px solid var(--tm-navy);
+  background: var(--tm-navy);
+  color: white;
+  border-radius: 8px;
+  padding: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tm-login-actions button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
 @media (max-width: 980px) {
   .tm-page {
     grid-template-columns: 1fr;
@@ -685,6 +778,10 @@
   .tm-admin-grid,
   .tm-form-grid,
   .tm-winner-row {
+    grid-template-columns: 1fr;
+  }
+
+  .tm-poster-items {
     grid-template-columns: 1fr;
   }
 

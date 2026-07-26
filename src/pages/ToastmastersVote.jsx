@@ -2,12 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
 import {
   getOrCreateVoterToken,
+  getCurrentUser,
   hasLocalVote,
   isCloudConfigured,
   loadLocalState,
   loadVoteState,
   markLocalVoted,
+  onAuthChange,
   saveVoteState,
+  signInWithEmail,
+  signOutUser,
+  signUpWithEmail,
   submitVote,
 } from '../services/tmVoteCloud'
 import './ToastmastersVote.css'
@@ -34,6 +39,7 @@ const LANG = {
     closeTime: '截止时间',
     prepared: '最佳备稿讲员',
     impromptu: '最佳即席讲员',
+    evaluator: '最佳评估员',
     name: '姓名',
     speechTitle: '演讲题目',
     project: '项目',
@@ -41,12 +47,14 @@ const LANG = {
     remove: '删除',
     addPrepared: '+ 添加备稿讲员',
     addImpromptu: '+ 添加即席讲员',
+    addEvaluator: '+ 添加评估员',
     voteLink: '投票链接',
     scanVote: '扫码投票',
     copyLink: '复制链接',
     downloadPoster: '下载分享图片',
     preparedCandidates: '备稿候选',
     impromptuCandidates: '即席候选',
+    evaluatorCandidates: '评估候选',
     totalVotes: '总票数',
     voteStatus: '投票状态',
     tonightVote: '今晚最佳表现投票',
@@ -62,9 +70,11 @@ const LANG = {
     realtime: '实时结果',
     bestPrepared: '最佳备稿',
     bestImpromptu: '最佳即席',
+    bestEvaluator: '最佳评估',
     votes: '票',
     preparedVotes: '备稿票数',
     impromptuVotes: '即席票数',
+    evaluatorVotes: '评估票数',
     historyDb: '历史得奖者资料库',
     noVotes: '暂无票数',
     tied: '同票',
@@ -83,6 +93,14 @@ const LANG = {
     loadFailed: '云端读取失败，已切换到本地模式。',
     saveFailed: '保存失败，请检查网络或 Supabase 设置。',
     duplicateVote: '这台设备已经投过票。',
+    privateSpace: '登录后，每个使用者都有自己的独立投票空间。',
+    email: 'Email',
+    password: '密码',
+    login: '登录',
+    createAccount: '建立账号',
+    logout: '登出',
+    loginTitle: 'Toastmasters 投票系统',
+    loginSubtitle: '登录你的独立空间，管理自己的会议、候选人和历史票数。',
   },
   en: {
     navAdmin: 'Setup',
@@ -105,6 +123,7 @@ const LANG = {
     closeTime: 'Close Time',
     prepared: 'Best Prepared Speaker',
     impromptu: 'Best Table Topics Speaker',
+    evaluator: 'Best Evaluator',
     name: 'Name',
     speechTitle: 'Speech Title',
     project: 'Project',
@@ -112,12 +131,14 @@ const LANG = {
     remove: 'Remove',
     addPrepared: '+ Add Prepared Speaker',
     addImpromptu: '+ Add Table Topics Speaker',
+    addEvaluator: '+ Add Evaluator',
     voteLink: 'Voting Link',
     scanVote: 'Scan to Vote',
     copyLink: 'Copy Link',
     downloadPoster: 'Download Share Image',
     preparedCandidates: 'Prepared Candidates',
     impromptuCandidates: 'Table Topics Candidates',
+    evaluatorCandidates: 'Evaluator Candidates',
     totalVotes: 'Total Votes',
     voteStatus: 'Voting Status',
     tonightVote: 'Tonight Best Performance Vote',
@@ -133,9 +154,11 @@ const LANG = {
     realtime: 'Live Results',
     bestPrepared: 'Best Prepared',
     bestImpromptu: 'Best Table Topics',
+    bestEvaluator: 'Best Evaluator',
     votes: 'votes',
     preparedVotes: 'Prepared Votes',
     impromptuVotes: 'Table Topics Votes',
+    evaluatorVotes: 'Evaluator Votes',
     historyDb: 'Winner History Database',
     noVotes: 'No votes yet',
     tied: 'Tied',
@@ -154,6 +177,14 @@ const LANG = {
     loadFailed: 'Cloud loading failed. Switched to local mode.',
     saveFailed: 'Save failed. Please check network or Supabase settings.',
     duplicateVote: 'This device has already voted.',
+    privateSpace: 'After login, every user has an independent voting workspace.',
+    email: 'Email',
+    password: 'Password',
+    login: 'Login',
+    createAccount: 'Create Account',
+    logout: 'Logout',
+    loginTitle: 'Toastmasters Voting System',
+    loginSubtitle: 'Sign in to manage your own meetings, candidates, and voting history.',
   },
 }
 
@@ -211,13 +242,14 @@ function SyncBadge({ source, syncStatus, t }) {
 
 function CandidateEditor({ type, candidates, onChange, t }) {
   const isPrepared = type === 'prepared'
+  const title = isPrepared ? t.prepared : type === 'evaluator' ? t.evaluator : t.impromptu
 
   function update(id, field, value) {
     onChange(candidates.map(item => item.id === id ? { ...item, [field]: value } : item))
   }
 
   function addCandidate() {
-    const nextId = `${isPrepared ? 'p' : 'i'}${Date.now()}`
+    const nextId = `${type[0]}${Date.now()}`
     onChange([
       ...candidates,
       isPrepared
@@ -234,7 +266,7 @@ function CandidateEditor({ type, candidates, onChange, t }) {
     <section className="tm-panel">
       <div className="tm-panel-title">
         <span className="tm-icon">{isPrepared ? '🏆' : '🎤'}</span>
-        <h2>{isPrepared ? t.prepared : t.impromptu}</h2>
+        <h2>{title}</h2>
       </div>
 
       {isPrepared ? (
@@ -266,7 +298,7 @@ function CandidateEditor({ type, candidates, onChange, t }) {
       )}
 
       <button className="tm-outline" onClick={addCandidate}>
-        {isPrepared ? t.addPrepared : t.addImpromptu}
+        {isPrepared ? t.addPrepared : type === 'evaluator' ? t.addEvaluator : t.addImpromptu}
       </button>
     </section>
   )
@@ -287,7 +319,10 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
     persistState(next)
   }
 
-  const savedVotes = data.prepared.reduce((sum, item) => sum + item.votes, 0) + data.impromptu.reduce((sum, item) => sum + item.votes, 0)
+  const savedVotes =
+    data.prepared.reduce((sum, item) => sum + item.votes, 0) +
+    data.impromptu.reduce((sum, item) => sum + item.votes, 0) +
+    data.evaluator.reduce((sum, item) => sum + item.votes, 0)
 
   return (
     <div className="tm-admin-grid">
@@ -328,6 +363,7 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
 
         <CandidateEditor type="prepared" candidates={data.prepared} onChange={list => updateCandidates('prepared', list)} t={t} />
         <CandidateEditor type="impromptu" candidates={data.impromptu} onChange={list => updateCandidates('impromptu', list)} t={t} />
+        <CandidateEditor type="evaluator" candidates={data.evaluator} onChange={list => updateCandidates('evaluator', list)} t={t} />
       </div>
 
       <aside className="tm-share-panel">
@@ -339,6 +375,7 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
         <button className="tm-outline" onClick={() => setView('share')}>{t.downloadPoster}</button>
         <div className="tm-stat-row"><span>{t.preparedCandidates}</span><b>{data.prepared.length}</b></div>
         <div className="tm-stat-row"><span>{t.impromptuCandidates}</span><b>{data.impromptu.length}</b></div>
+        <div className="tm-stat-row"><span>{t.evaluatorCandidates}</span><b>{data.evaluator.length}</b></div>
         <div className="tm-stat-row"><span>{t.totalVotes}</span><b>{savedVotes}</b></div>
         <div className="tm-stat-row"><span>{t.voteStatus}</span><b>{meetingStatusLabel(data.meeting.status, t)}</b></div>
       </aside>
@@ -369,18 +406,19 @@ function VoteCard({ title, candidates, selected, onSelect, prepared, t }) {
 function VoteView({ data, setData, setView, t }) {
   const [preparedPick, setPreparedPick] = useState('')
   const [impromptuPick, setImpromptuPick] = useState('')
+  const [evaluatorPick, setEvaluatorPick] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const alreadyVoted = hasLocalVote(data.meeting.number)
   const isOpen = ['open', '开放投票', '开放中'].includes(data.meeting.status)
 
   async function handleSubmitVote() {
-    if (!preparedPick || !impromptuPick || alreadyVoted) return
+    if (!preparedPick || !impromptuPick || !evaluatorPick || alreadyVoted) return
     setSubmitting(true)
     setError('')
     try {
       const voterToken = getOrCreateVoterToken(data.meeting.number)
-      const result = await submitVote(data, preparedPick, impromptuPick, voterToken)
+      const result = await submitVote(data, preparedPick, impromptuPick, evaluatorPick, voterToken)
       setData(result.data)
       markLocalVoted(data.meeting.number)
       setView('success')
@@ -403,7 +441,6 @@ function VoteView({ data, setData, setView, t }) {
         <div className="tm-success-card">
           <h2>{t.alreadyVoted}</h2>
           <p>{t.thanksJoin}</p>
-          <button onClick={() => setView('results')}>{t.viewResults}</button>
         </div>
       ) : !isOpen ? (
         <div className="tm-success-card">
@@ -414,7 +451,8 @@ function VoteView({ data, setData, setView, t }) {
         <>
           <VoteCard title={t.prepared} candidates={data.prepared} selected={preparedPick} onSelect={setPreparedPick} prepared t={t} />
           <VoteCard title={t.impromptu} candidates={data.impromptu} selected={impromptuPick} onSelect={setImpromptuPick} t={t} />
-          <button className="tm-submit-vote" disabled={!preparedPick || !impromptuPick || submitting} onClick={handleSubmitVote}>
+          <VoteCard title={t.evaluator} candidates={data.evaluator} selected={evaluatorPick} onSelect={setEvaluatorPick} t={t} />
+          <button className="tm-submit-vote" disabled={!preparedPick || !impromptuPick || !evaluatorPick || submitting} onClick={handleSubmitVote}>
             {submitting ? t.submitting : t.submit}
           </button>
           {error && <p className="tm-error">{error}</p>}
@@ -445,6 +483,7 @@ function SharePoster({ data, t }) {
         <div className="tm-poster-items">
           <strong>{t.prepared}</strong>
           <strong>{t.impromptu}</strong>
+          <strong>{t.evaluator}</strong>
         </div>
         <div className="tm-poster-meta">
           <span>{t.date}: {data.meeting.date}</span>
@@ -459,8 +498,10 @@ function SharePoster({ data, t }) {
 function ResultsView({ data, t }) {
   const preparedWinner = winner(data.prepared, t)
   const impromptuWinner = winner(data.impromptu, t)
+  const evaluatorWinner = winner(data.evaluator, t)
   const maxPrepared = Math.max(1, ...data.prepared.map(item => item.votes))
   const maxImpromptu = Math.max(1, ...data.impromptu.map(item => item.votes))
+  const maxEvaluator = Math.max(1, ...data.evaluator.map(item => item.votes))
 
   return (
     <div className="tm-results-grid">
@@ -469,6 +510,7 @@ function ResultsView({ data, t }) {
         <div className="tm-winner-row">
           <div><span>{t.bestPrepared}</span><b>{preparedWinner.label}</b><small>{preparedWinner.votes} {t.votes}</small></div>
           <div><span>{t.bestImpromptu}</span><b>{impromptuWinner.label}</b><small>{impromptuWinner.votes} {t.votes}</small></div>
+          <div><span>{t.bestEvaluator}</span><b>{evaluatorWinner.label}</b><small>{evaluatorWinner.votes} {t.votes}</small></div>
         </div>
       </section>
       <section className="tm-panel">
@@ -478,6 +520,10 @@ function ResultsView({ data, t }) {
       <section className="tm-panel">
         <h2>{t.impromptuVotes}</h2>
         {data.impromptu.map(item => <Bar key={item.id} item={item} max={maxImpromptu} />)}
+      </section>
+      <section className="tm-panel">
+        <h2>{t.evaluatorVotes}</h2>
+        {data.evaluator.map(item => <Bar key={item.id} item={item} max={maxEvaluator} />)}
       </section>
     </div>
   )
@@ -503,6 +549,8 @@ function HistoryView({ data, t }) {
       preparedVotes: winner(data.prepared, t).votes,
       impromptuWinner: winner(data.impromptu, t).label,
       impromptuVotes: winner(data.impromptu, t).votes,
+      evaluatorWinner: winner(data.evaluator, t).label,
+      evaluatorVotes: winner(data.evaluator, t).votes,
     },
   ]
 
@@ -516,6 +564,7 @@ function HistoryView({ data, t }) {
             <span>{record.date}</span>
             <p>{t.bestPrepared}: {record.preparedWinner || t.pending} ({record.preparedVotes} {t.votes})</p>
             <p>{t.bestImpromptu}: {record.impromptuWinner || t.pending} ({record.impromptuVotes} {t.votes})</p>
+            <p>{t.bestEvaluator}: {record.evaluatorWinner || t.pending} ({record.evaluatorVotes} {t.votes})</p>
           </div>
         ))}
       </div>
@@ -523,29 +572,113 @@ function HistoryView({ data, t }) {
   )
 }
 
+function normalizeState(next) {
+  return {
+    ...next,
+    evaluator: next.evaluator || [
+      { id: 'e1', name: '胡惠钦', votes: 0 },
+      { id: 'e2', name: '叶雪娥', votes: 0 },
+    ],
+    history: (next.history || []).map(record => ({
+      ...record,
+      evaluatorWinner: record.evaluatorWinner || '',
+      evaluatorVotes: record.evaluatorVotes || 0,
+    })),
+  }
+}
+
+function LoginView({ lang, setLang, t, onLogin }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function submit(mode) {
+    setBusy(true)
+    setError('')
+    try {
+      const user = mode === 'signup'
+        ? await signUpWithEmail(email, password)
+        : await signInWithEmail(email, password)
+      onLogin(user)
+    } catch (err) {
+      setError(err.message || t.saveFailed)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="tm-login-page">
+      <div className="tm-login-card">
+        <div className="tm-brand tm-login-brand">TM Vote</div>
+        <LanguageToggle lang={lang} setLang={setLang} t={t} />
+        <h1>{t.loginTitle}</h1>
+        <p>{t.loginSubtitle}</p>
+        <p className="tm-login-note">{t.privateSpace}</p>
+        <label>
+          <span>{t.email}</span>
+          <input value={email} onChange={e => setEmail(e.target.value)} type="email" />
+        </label>
+        <label>
+          <span>{t.password}</span>
+          <input value={password} onChange={e => setPassword(e.target.value)} type="password" />
+        </label>
+        {error && <p className="tm-error">{error}</p>}
+        <div className="tm-login-actions">
+          <button disabled={busy || !email || !password} onClick={() => submit('login')}>{t.login}</button>
+          <button disabled={busy || !email || !password} className="tm-outline" onClick={() => submit('signup')}>{t.createAccount}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ToastmastersVote() {
   const [data, setData] = useState(null)
   const publicView = new URLSearchParams(window.location.search).get('view') === 'vote'
+  const publicSpace = new URLSearchParams(window.location.search).get('space') || ''
   const [view, setView] = useState(publicView ? 'vote' : 'admin')
   const [lang, setLang] = useState(() => localStorage.getItem('tm-vote-lang') || 'zh')
+  const [user, setUser] = useState(null)
+  const [authReady, setAuthReady] = useState(!isCloudConfigured || publicView)
   const [source, setSource] = useState(isCloudConfigured ? 'cloud' : 'local')
   const [syncStatus, setSyncStatus] = useState('')
   const t = LANG[lang]
 
   useEffect(() => {
+    if (!isCloudConfigured || publicView) return undefined
+    let mounted = true
+    getCurrentUser().then(currentUser => {
+      if (!mounted) return
+      setUser(currentUser)
+      setAuthReady(true)
+    })
+    const unsubscribe = onAuthChange(nextUser => {
+      setUser(nextUser)
+      setAuthReady(true)
+    })
+    return () => {
+      mounted = false
+      unsubscribe()
+    }
+  }, [publicView])
+
+  useEffect(() => {
     let ignore = false
     async function hydrate() {
+      if (!authReady || (!publicView && isCloudConfigured && !user)) return
       setSyncStatus(t.syncing)
       try {
-        const result = await loadVoteState()
+        const result = await loadVoteState(publicView ? publicSpace : '')
         if (!ignore) {
-          setData(result.data)
+          setData(normalizeState(result.data))
           setSource(result.source)
           setSyncStatus('')
         }
       } catch {
         if (!ignore) {
-          setData(loadLocalState())
+          setData(normalizeState(loadLocalState()))
           setSource('local')
           setSyncStatus(t.loadFailed)
         }
@@ -553,7 +686,7 @@ export default function ToastmastersVote() {
     }
     hydrate()
     return () => { ignore = true }
-  }, [])
+  }, [authReady, user, publicView, publicSpace])
 
   function changeLang(nextLang) {
     setLang(nextLang)
@@ -571,6 +704,12 @@ export default function ToastmastersVote() {
     }
   }
 
+  async function handleLogout() {
+    await signOutUser()
+    setUser(null)
+    setData(null)
+  }
+
   const nav = useMemo(() => [
     ['admin', t.navAdmin],
     ['vote', t.navVote],
@@ -578,6 +717,14 @@ export default function ToastmastersVote() {
     ['results', t.navResults],
     ['history', t.navHistory],
   ], [t])
+
+  if (!authReady) {
+    return <div className="tm-success-card"><h2>{t.syncing}</h2></div>
+  }
+
+  if (!publicView && isCloudConfigured && !user) {
+    return <LoginView lang={lang} setLang={changeLang} t={t} onLogin={setUser} />
+  }
 
   if (!data) {
     return (
@@ -598,6 +745,7 @@ export default function ToastmastersVote() {
       {!publicView && <aside className="tm-sidebar">
         <div className="tm-brand">TM Vote</div>
         <LanguageToggle lang={lang} setLang={changeLang} t={t} />
+        {isCloudConfigured && <button onClick={handleLogout}>{t.logout}</button>}
         {nav.map(([key, label]) => (
           <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
         ))}
@@ -605,7 +753,7 @@ export default function ToastmastersVote() {
       <main className="tm-content">
         {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={t} />}
         {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={t} />}
-        {view === 'success' && <div className="tm-success-card"><h1>{t.thankVote}</h1><p>{t.recorded}</p><button onClick={() => setView('results')}>{t.viewResults}</button></div>}
+        {view === 'success' && <div className="tm-success-card"><h1>{t.thankVote}</h1><p>{t.recorded}</p></div>}
         {view === 'share' && <SharePoster data={data} t={t} />}
         {view === 'results' && <ResultsView data={data} t={t} />}
         {view === 'history' && <HistoryView data={data} t={t} />}

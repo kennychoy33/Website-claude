@@ -1,5 +1,6 @@
 create table if not exists public.tm_meetings (
   id text primary key,
+  owner_id uuid references auth.users(id) on delete cascade,
   meeting_number text not null,
   meeting_date text not null,
   theme text not null,
@@ -14,7 +15,7 @@ create table if not exists public.tm_meetings (
 create table if not exists public.tm_candidates (
   id text primary key,
   meeting_id text not null references public.tm_meetings(id) on delete cascade,
-  category text not null check (category in ('prepared', 'impromptu')),
+  category text not null check (category in ('prepared', 'impromptu', 'evaluator')),
   name text not null default '',
   speech_title text,
   project text,
@@ -29,6 +30,7 @@ create table if not exists public.tm_votes (
   voter_token text not null,
   prepared_candidate_id text not null references public.tm_candidates(id) on delete cascade,
   impromptu_candidate_id text not null references public.tm_candidates(id) on delete cascade,
+  evaluator_candidate_id text references public.tm_candidates(id) on delete cascade,
   created_at timestamptz not null default now(),
   unique (meeting_id, voter_token)
 );
@@ -41,13 +43,33 @@ create table if not exists public.tm_winner_history (
   prepared_votes integer not null default 0,
   impromptu_winner text,
   impromptu_votes integer not null default 0,
+  evaluator_winner text,
+  evaluator_votes integer not null default 0,
   created_at timestamptz not null default now()
 );
+
+alter table public.tm_meetings
+  add column if not exists owner_id uuid references auth.users(id) on delete cascade;
+
+alter table public.tm_votes
+  add column if not exists evaluator_candidate_id text references public.tm_candidates(id) on delete cascade;
+
+alter table public.tm_winner_history
+  add column if not exists evaluator_winner text,
+  add column if not exists evaluator_votes integer not null default 0;
+
+alter table public.tm_candidates
+  drop constraint if exists tm_candidates_category_check;
+
+alter table public.tm_candidates
+  add constraint tm_candidates_category_check
+  check (category in ('prepared', 'impromptu', 'evaluator'));
 
 create or replace function public.tm_submit_vote(
   p_meeting_id text,
   p_prepared_candidate_id text,
   p_impromptu_candidate_id text,
+  p_evaluator_candidate_id text,
   p_voter_token text
 )
 returns jsonb
@@ -69,18 +91,20 @@ begin
     meeting_id,
     voter_token,
     prepared_candidate_id,
-    impromptu_candidate_id
+    impromptu_candidate_id,
+    evaluator_candidate_id
   )
   values (
     p_meeting_id,
     p_voter_token,
     p_prepared_candidate_id,
-    p_impromptu_candidate_id
+    p_impromptu_candidate_id,
+    p_evaluator_candidate_id
   );
 
   update public.tm_candidates
   set votes = votes + 1
-  where id in (p_prepared_candidate_id, p_impromptu_candidate_id)
+  where id in (p_prepared_candidate_id, p_impromptu_candidate_id, p_evaluator_candidate_id)
     and meeting_id = p_meeting_id;
 
   return jsonb_build_object('already_voted', false);
@@ -110,14 +134,14 @@ using (true);
 
 create policy "tm meetings public write"
 on public.tm_meetings for insert
-to anon
-with check (true);
+to authenticated
+with check (owner_id = (select auth.uid()));
 
 create policy "tm meetings public update"
 on public.tm_meetings for update
-to anon
-using (true)
-with check (true);
+to authenticated
+using (owner_id = (select auth.uid()))
+with check (owner_id = (select auth.uid()));
 
 create policy "tm candidates public read"
 on public.tm_candidates for select
@@ -126,19 +150,43 @@ using (true);
 
 create policy "tm candidates public write"
 on public.tm_candidates for insert
-to anon
-with check (true);
+to authenticated
+with check (
+  exists (
+    select 1 from public.tm_meetings
+    where tm_meetings.id = tm_candidates.meeting_id
+      and tm_meetings.owner_id = (select auth.uid())
+  )
+);
 
 create policy "tm candidates public update"
 on public.tm_candidates for update
-to anon
-using (true)
-with check (true);
+to authenticated
+using (
+  exists (
+    select 1 from public.tm_meetings
+    where tm_meetings.id = tm_candidates.meeting_id
+      and tm_meetings.owner_id = (select auth.uid())
+  )
+)
+with check (
+  exists (
+    select 1 from public.tm_meetings
+    where tm_meetings.id = tm_candidates.meeting_id
+      and tm_meetings.owner_id = (select auth.uid())
+  )
+);
 
 create policy "tm candidates public delete"
 on public.tm_candidates for delete
-to anon
-using (true);
+to authenticated
+using (
+  exists (
+    select 1 from public.tm_meetings
+    where tm_meetings.id = tm_candidates.meeting_id
+      and tm_meetings.owner_id = (select auth.uid())
+  )
+);
 
 create policy "tm votes public insert"
 on public.tm_votes for insert
