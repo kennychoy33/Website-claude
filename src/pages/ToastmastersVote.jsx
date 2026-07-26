@@ -170,6 +170,14 @@ const LANG = {
     createClubHint: '请填写分会名称、User Name 和 Password',
     clubList: '分会列表',
     newMeeting: '新建例会',
+    editMeeting: '修改例会',
+    meetingRecords: '例会记录',
+    currentMeeting: '本次例会',
+    lockedMeeting: '已锁定',
+    editableMeeting: '可修改',
+    savedMeeting: '已收藏',
+    selectRecord: '查看旧记录',
+    recordLockedNote: '旧记录只能查看，不能删除。收藏超过 7 天后不允许修改。',
     importAgenda: '导入例会表 / Excel',
     exportExcel: '导出 Excel',
     templateReady: '已上传模板',
@@ -320,6 +328,14 @@ const LANG = {
     createClubHint: 'Please enter club name, user name, and password',
     clubList: 'Club List',
     newMeeting: 'New Meeting',
+    editMeeting: 'Edit Meeting',
+    meetingRecords: 'Meeting Records',
+    currentMeeting: 'Current Meeting',
+    lockedMeeting: 'Locked',
+    editableMeeting: 'Editable',
+    savedMeeting: 'Saved Meeting',
+    selectRecord: 'View Past Record',
+    recordLockedNote: 'Past records are view-only and cannot be deleted. Saved records lock after 7 days.',
     importAgenda: 'Import Agenda / Excel',
     exportExcel: 'Export Excel',
     templateReady: 'Template uploaded',
@@ -1268,16 +1284,16 @@ function personLabel(people, type, id) {
   return list.find(item => item.id === id)?.name || ''
 }
 
-function PersonSelect({ people, personType, personId, onChange, t }) {
+function PersonSelect({ people, personType, personId, onChange, t, disabled = false }) {
   const list = personType === 'guest' ? people.guests : people.members
 
   return (
     <div className="tm-person-select">
-      <select value={personType} onChange={event => onChange(event.target.value, '')}>
+      <select disabled={disabled} value={personType} onChange={event => onChange(event.target.value, '')}>
         <option value="member">{t.member}</option>
         <option value="guest">{t.guest}</option>
       </select>
-      <select value={personId} onChange={event => onChange(personType, event.target.value)}>
+      <select disabled={disabled} value={personId} onChange={event => onChange(personType, event.target.value)}>
         <option value="">{t.name}</option>
         {list.map(item => (
           <option key={item.id} value={item.id}>{item.name}</option>
@@ -1330,7 +1346,29 @@ function fullToastmastersRoles(settings) {
   })
 }
 
+function meetingRecordKey() {
+  return 'tm-meeting-records-v1'
+}
+
+function isRecordLocked(record) {
+  if (!record?.savedAt) return false
+  const savedTime = new Date(record.savedAt).getTime()
+  if (Number.isNaN(savedTime)) return false
+  return Date.now() - savedTime > 7 * 24 * 60 * 60 * 1000
+}
+
 function MeetingView({ data, setData, persistState, people, meetingOps, setMeetingOps, persistMeetingOps, syncStatus, t, settings }) {
+  const [records, setRecords] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(meetingRecordKey()) || '[]')
+    } catch {
+      return []
+    }
+  })
+  const [selectedRecordId, setSelectedRecordId] = useState('current')
+  const selectedRecord = records.find(record => record.id === selectedRecordId)
+  const viewingOldRecord = selectedRecordId !== 'current'
+  const locked = viewingOldRecord || isRecordLocked(selectedRecord)
   const attendanceIndex = new Map(meetingOps.attendance.map(item => [`${item.personType}:${item.personId}`, item.attended]))
   const attendanceRows = [
     ...people.members.map(item => ({ personType: 'member', personId: item.id, name: item.name })),
@@ -1338,10 +1376,12 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
   ].filter(item => item.name)
 
   function updateMeeting(field, value) {
+    if (locked) return
     setData({ ...data, meeting: { ...data.meeting, [field]: value } })
   }
 
   function updateAttendance(personType, personId, attended) {
+    if (locked) return
     const key = `${personType}:${personId}`
     const existing = meetingOps.attendance.find(item => `${item.personType}:${item.personId}` === key)
     const nextAttendance = existing
@@ -1351,6 +1391,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
   }
 
   function updateRole(id, field, value) {
+    if (locked) return
     setMeetingOps({
       ...meetingOps,
       roles: meetingOps.roles.map(item => item.id === id ? { ...item, [field]: value } : item),
@@ -1358,6 +1399,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
   }
 
   function updateRolePerson(id, personType, personId) {
+    if (locked) return
     setMeetingOps({
       ...meetingOps,
       roles: meetingOps.roles.map(item => item.id === id ? { ...item, personType, personId } : item),
@@ -1365,6 +1407,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
   }
 
   function addRole() {
+    if (locked) return
     setMeetingOps({
       ...meetingOps,
       roles: [...meetingOps.roles, { id: `r${Date.now()}`, roleName: '', time: '', personType: 'member', personId: '' }],
@@ -1372,14 +1415,17 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
   }
 
   function removeRole(id) {
+    if (locked) return
     setMeetingOps({ ...meetingOps, roles: meetingOps.roles.filter(item => item.id !== id) })
   }
 
   function resetRolesFromTemplate() {
+    if (locked) return
     setMeetingOps({ ...meetingOps, roles: fullToastmastersRoles(settings) })
   }
 
   function createMeeting() {
+    setSelectedRecordId('current')
     const roles = fullToastmastersRoles(settings)
     const currentNumber = String(data.meeting.number || '').match(/\d+/)?.[0]
     const nextNumber = currentNumber ? `第${Number(currentNumber) + 1}次` : ''
@@ -1431,8 +1477,35 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
   }
 
   async function saveMeetingAll() {
+    if (locked) return
     await persistState(data)
     await persistMeetingOps(meetingOps)
+    const record = {
+      id: data.meeting.id || `${Date.now()}`,
+      savedAt: new Date().toISOString(),
+      data,
+      meetingOps,
+    }
+    const nextRecords = [
+      record,
+      ...records.filter(item => item.id !== record.id),
+    ]
+    setRecords(nextRecords)
+    localStorage.setItem(meetingRecordKey(), JSON.stringify(nextRecords))
+    setSelectedRecordId(record.id)
+  }
+
+  function selectRecord(id) {
+    setSelectedRecordId(id)
+    if (id === 'current') return
+    const record = records.find(item => item.id === id)
+    if (!record) return
+    setData(record.data)
+    setMeetingOps(record.meetingOps)
+  }
+
+  function editCurrent() {
+    setSelectedRecordId('current')
   }
 
   return (
@@ -1440,22 +1513,44 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
       <div className="tm-screen-head no-print">
         <div>
           <h1>{t.navMeeting}</h1>
-          <p>{data.meeting.number} {t.regularMeeting} | {data.meeting.date}</p>
+          <p>{data.meeting.number || t.currentMeeting} {t.regularMeeting} | {data.meeting.date}</p>
+          <p className="tm-lock-note">{locked ? t.lockedMeeting : t.editableMeeting} · {t.recordLockedNote}</p>
           {syncStatus && <div className="tm-sync-badge"><b>{syncStatus}</b></div>}
         </div>
         <div className="tm-actions">
           <button className="tm-gold" onClick={createMeeting}>{t.newMeeting}</button>
+          <button onClick={editCurrent}>{t.editMeeting}</button>
           <label className="tm-file-action">
             {t.importAgenda}
             <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv" onChange={importAgendaFile} />
           </label>
           <button onClick={exportExcel}>{t.exportExcel}</button>
-          <button onClick={saveMeetingAll}>{t.save}</button>
-          <button onClick={addRole}>{t.addRole}</button>
-          <button onClick={resetRolesFromTemplate}>{t.resetRoles}</button>
+          <button onClick={saveMeetingAll} disabled={locked}>{t.save}</button>
+          <button onClick={addRole} disabled={locked}>{t.addRole}</button>
+          <button onClick={resetRolesFromTemplate} disabled={locked}>{t.resetRoles}</button>
           <button onClick={() => window.print()}>{t.printAgenda}</button>
         </div>
       </div>
+
+      <section className="tm-panel no-print">
+        <div className="tm-panel-title">
+          <span className="tm-icon">☷</span>
+          <h2>{t.meetingRecords}</h2>
+        </div>
+        <div className="tm-record-toolbar">
+          <label>
+            <span>{t.selectRecord}</span>
+            <select value={selectedRecordId} onChange={event => selectRecord(event.target.value)}>
+              <option value="current">{t.currentMeeting}</option>
+              {records.map(record => (
+                <option key={record.id} value={record.id}>
+                  {record.data?.meeting?.number || record.id} | {record.data?.meeting?.date || ''} {isRecordLocked(record) ? `(${t.lockedMeeting})` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </section>
 
       <section className="tm-panel no-print">
         <div className="tm-panel-title">
@@ -1472,7 +1567,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
           ].map(([field, label]) => (
             <label key={field}>
               <span>{label}</span>
-              <input value={data.meeting[field] || ''} onChange={event => updateMeeting(field, event.target.value)} />
+              <input disabled={locked} value={data.meeting[field] || ''} onChange={event => updateMeeting(field, event.target.value)} />
             </label>
           ))}
         </div>
@@ -1490,6 +1585,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
               <label key={`${item.personType}-${item.personId}`} className="tm-attendance-item">
                 <input
                   type="checkbox"
+                  disabled={locked}
                   checked={checked}
                   onChange={event => updateAttendance(item.personType, item.personId, event.target.checked)}
                 />
@@ -1515,16 +1611,17 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
           </div>
           {meetingOps.roles.map(item => (
             <div className="tm-role-row" key={item.id}>
-              <input value={item.roleName} onChange={event => updateRole(item.id, 'roleName', event.target.value)} />
-              <input value={item.time || ''} onChange={event => updateRole(item.id, 'time', event.target.value)} />
+              <input disabled={locked} value={item.roleName} onChange={event => updateRole(item.id, 'roleName', event.target.value)} />
+              <input disabled={locked} value={item.time || ''} onChange={event => updateRole(item.id, 'time', event.target.value)} />
               <PersonSelect
                 people={people}
                 personType={item.personType}
                 personId={item.personId}
-                onChange={(personType, personId) => updateRolePerson(item.id, personType, personId)}
+                onChange={(personType, personId) => !locked && updateRolePerson(item.id, personType, personId)}
                 t={t}
+                disabled={locked}
               />
-              <button className="tm-danger" onClick={() => removeRole(item.id)}>{t.remove}</button>
+              <button className="tm-danger" disabled={locked} onClick={() => removeRole(item.id)}>{t.remove}</button>
             </div>
           ))}
         </div>

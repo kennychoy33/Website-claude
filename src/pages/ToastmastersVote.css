@@ -176,6 +176,16 @@
   cursor: pointer;
 }
 
+.tm-actions button:disabled,
+.tm-panel button:disabled,
+.tm-role-row input:disabled,
+.tm-role-row select:disabled,
+.tm-attendance-item input:disabled,
+.tm-form-grid input:disabled {
+  opacity: .58;
+  cursor: not-allowed;
+}
+
 .tm-actions .tm-gold,
 .tm-share-panel button:first-of-type,
 .tm-submit-vote,
@@ -437,6 +447,36 @@
 
 .tm-file-action input {
   display: none;
+}
+
+.tm-lock-note {
+  margin-top: 8px !important;
+  color: var(--tm-burgundy) !important;
+  font-size: 14px !important;
+  font-weight: 900 !important;
+}
+
+.tm-record-toolbar {
+  display: grid;
+  grid-template-columns: minmax(240px, 420px);
+}
+
+.tm-record-toolbar label span {
+  display: block;
+  color: var(--tm-muted);
+  font-weight: 900;
+  margin-bottom: 8px;
+}
+
+.tm-record-toolbar select {
+  width: 100%;
+  border: 1px solid #c8d7e8;
+  border-radius: 8px;
+  padding: 13px;
+  font: inherit;
+  font-weight: 800;
+  color: var(--tm-ink);
+  background: white;
 }
 
 .tm-form-grid {
