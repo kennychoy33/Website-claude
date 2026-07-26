@@ -88,6 +88,10 @@ const LANG = {
     notOpen: '投票尚未开放',
     waitOpen: '请等待会议维护人员开放投票。',
     missingSpace: '投票链接缺少分会空间，请重新扫描管理员分享的 QR。',
+    cloudNotReadyTitle: '云端未连接',
+    cloudNotReadyAdmin: '此版本没有连接 Supabase 云端数据库，不能开放投票或分享 QR。请先在 GitHub repository secrets 设置 VITE_SUPABASE_URL 和 VITE_SUPABASE_ANON_KEY，再重新部署。',
+    cloudNotReadyVoter: '这个投票链接目前没有连接数据库，请联系会议维护人员重新发布云端版 QR。',
+    cloudNotReadyQr: '云端未连接，QR 已停用，避免票数和后台资料不同步。',
     unnamed: '未命名',
     submit: '提交投票',
     submitting: '提交中...',
@@ -251,6 +255,10 @@ const LANG = {
     notOpen: 'Voting is not open yet',
     waitOpen: 'Please wait for the meeting admin to open voting.',
     missingSpace: 'Voting link is missing the club workspace. Please scan the admin QR again.',
+    cloudNotReadyTitle: 'Cloud is not connected',
+    cloudNotReadyAdmin: 'This build is not connected to the Supabase cloud database, so voting and QR sharing are disabled. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in GitHub repository secrets, then redeploy.',
+    cloudNotReadyVoter: 'This voting link is not connected to the database. Please ask the meeting admin to publish the cloud QR again.',
+    cloudNotReadyQr: 'Cloud is not connected. QR is disabled to prevent votes from drifting away from admin data.',
     unnamed: 'Unnamed',
     submit: 'Submit Vote',
     submitting: 'Submitting...',
@@ -573,6 +581,8 @@ function CandidateEditor({ type, candidates, onChange, t, people, meetingRoles =
 }
 
 function AdminView({ data, setData, setView, persistState, source, syncStatus, t, people, meetingOps, spaceId, voteLink }) {
+  const cloudReady = isCloudConfigured && source === 'cloud' && spaceId && !spaceId.startsWith('local-')
+
   function updateMeeting(field, value) {
     setData({ ...data, meeting: { ...data.meeting, [field]: value } })
   }
@@ -599,6 +609,7 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
   }
 
   function setStatus(status) {
+    if (status === 'open' && !cloudReady) return
     const next = syncedVoteData({ ...data, meeting: { ...data.meeting, status } })
     setData(next)
     persistState(next)
@@ -649,10 +660,17 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
             <button onClick={saveSetup}>{t.save}</button>
             <button onClick={importFromMembers}>{t.importMembers}</button>
             <button onClick={syncFromMeetingRoles}>{t.syncFromRoles}</button>
-            <button className="tm-gold" onClick={() => setStatus('open')}>{t.openVote}</button>
-            <button onClick={() => setView('vote')}>{t.preview}</button>
+            <button className="tm-gold" disabled={!cloudReady} onClick={() => setStatus('open')}>{t.openVote}</button>
+            <button disabled={!cloudReady} onClick={() => setView('vote')}>{t.preview}</button>
           </div>
         </div>
+
+        {!cloudReady && (
+          <section className="tm-panel tm-note-panel">
+            <h2>{t.cloudNotReadyTitle}</h2>
+            <p>{t.cloudNotReadyAdmin}</p>
+          </section>
+        )}
 
         <section className="tm-panel">
           <div className="tm-panel-title">
@@ -682,11 +700,17 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
 
       <aside className="tm-share-panel">
         <h2>{t.voteLink}</h2>
-        <p>{t.scanVote}</p>
-        <QrBlock value={voteLink} />
-        <strong>{voteLink}</strong>
-        <button onClick={() => navigator.clipboard?.writeText(voteLink)}>{t.copyLink}</button>
-        <button className="tm-outline" onClick={() => setView('share')}>{t.downloadPoster}</button>
+        {cloudReady ? (
+          <>
+            <p>{t.scanVote}</p>
+            <QrBlock value={voteLink} />
+            <strong>{voteLink}</strong>
+            <button onClick={() => navigator.clipboard?.writeText(voteLink)}>{t.copyLink}</button>
+            <button className="tm-outline" onClick={() => setView('share')}>{t.downloadPoster}</button>
+          </>
+        ) : (
+          <div className="tm-empty-row">{t.cloudNotReadyQr}</div>
+        )}
         <div className="tm-stat-row"><span>{t.preparedCandidates}</span><b>{data.prepared.length}</b></div>
         <div className="tm-stat-row"><span>{t.impromptuCandidates}</span><b>{data.impromptu.length}</b></div>
         <div className="tm-stat-row"><span>{t.evaluatorCandidates}</span><b>{data.evaluator.length}</b></div>
@@ -1127,8 +1151,8 @@ function SharePoster({ data, t, voteLink }) {
   if (!isCloudConfigured) {
     return (
       <div className="tm-success-card">
-        <h2>云端未连接</h2>
-        <p>请先在 GitHub repository secrets 设置 VITE_SUPABASE_URL 和 VITE_SUPABASE_ANON_KEY，再重新部署，QR 才会和后台资料同步。</p>
+        <h2>{t.cloudNotReadyTitle}</h2>
+        <p>{t.cloudNotReadyAdmin}</p>
       </div>
     )
   }
@@ -2108,8 +2132,8 @@ export default function ToastmastersVote() {
       <div className="tm-page public">
         <main className="tm-content">
           <div className="tm-success-card">
-            <h2>云端未连接</h2>
-            <p>这个投票链接目前没有连接数据库，请联系会议维护人员重新发布云端版 QR。</p>
+            <h2>{appText.cloudNotReadyTitle}</h2>
+            <p>{appText.cloudNotReadyVoter}</p>
           </div>
         </main>
       </div>
