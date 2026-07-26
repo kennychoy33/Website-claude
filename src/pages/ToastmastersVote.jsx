@@ -15,6 +15,7 @@ import {
   saveVoteState,
   saveMeetingOpsState,
   savePeopleState,
+  seedPeopleState,
   saveSystemSettings,
   signInWithEmail,
   signOutUser,
@@ -130,6 +131,7 @@ const LANG = {
     syncFromRoles: '同步当前例会职务',
     importRole: '导入例会职务',
     peopleSaved: '会员/嘉宾已保存',
+    importChungHwaList: '导入中化名单',
     meetingSaved: '例会资料已保存',
     attendanceTitle: '出席记录',
     rolesTitle: '职务分配',
@@ -291,6 +293,7 @@ const LANG = {
     syncFromRoles: 'Sync Current Meeting Roles',
     importRole: 'Import Meeting Role',
     peopleSaved: 'Members / guests saved',
+    importChungHwaList: 'Import Chung Hwa List',
     meetingSaved: 'Meeting details saved',
     attendanceTitle: 'Attendance',
     rolesTitle: 'Role Assignment',
@@ -1266,6 +1269,21 @@ function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
     setPeople({ ...people, guests: people.guests.filter(item => item.id !== id) })
   }
 
+  function importChungHwaList() {
+    const mergeByName = (current, incoming, prefix) => {
+      const existingNames = new Set(current.map(item => item.name))
+      const additions = incoming
+        .filter(item => item.name && !existingNames.has(item.name))
+        .map((item, index) => ({ ...item, id: `${prefix}${Date.now()}${index}` }))
+      return [...current, ...additions]
+    }
+
+    setPeople({
+      members: mergeByName(people.members, seedPeopleState.members, 'm'),
+      guests: mergeByName(people.guests, seedPeopleState.guests, 'g'),
+    })
+  }
+
   return (
     <div className="tm-main-column">
       <div className="tm-screen-head">
@@ -1276,6 +1294,7 @@ function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
         </div>
         <div className="tm-actions">
           <button className="tm-gold" onClick={() => persistPeople(people)}>{t.save}</button>
+          <button onClick={importChungHwaList}>{t.importChungHwaList}</button>
           <button onClick={addMember}>{t.addMember}</button>
           <button onClick={addGuest}>{t.addGuest}</button>
         </div>
