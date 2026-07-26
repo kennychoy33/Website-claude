@@ -56,6 +56,11 @@ function getMeetingId(spaceId = '') {
   return spaceId ? `${spaceId}-${TM_VOTE_MEETING_ID}` : TM_VOTE_MEETING_ID
 }
 
+function getSpaceIdFromMeetingId(meetingId = '') {
+  const suffix = `-${TM_VOTE_MEETING_ID}`
+  return meetingId.endsWith(suffix) ? meetingId.slice(0, -suffix.length) : ''
+}
+
 export const seedState = {
   meeting: {
     id: TM_VOTE_MEETING_ID,
@@ -143,7 +148,7 @@ export async function loadVoteState(spaceId = '') {
 
   return {
     data: {
-      meeting: fromMeetingRow(meeting),
+      meeting: { ...fromMeetingRow(meeting), link: meeting.public_link || getPublicVoteUrl(activeSpace) },
       prepared: candidates.filter(item => item.category === 'prepared').map(fromCandidateRow),
       impromptu: candidates.filter(item => item.category === 'impromptu').map(fromCandidateRow),
       evaluator: candidates.filter(item => item.category === 'evaluator').map(fromCandidateRow),
@@ -219,7 +224,7 @@ export async function submitVote(state, preparedId, impromptuId, evaluatorId, vo
     throw err
   }
 
-  return loadVoteState()
+  return loadVoteState(getSpaceIdFromMeetingId(meetingId))
 }
 
 export function getOrCreateVoterToken(meetingNumber) {
