@@ -140,6 +140,17 @@ export const seedPeopleState = {
   ],
 }
 
+export const seedMeetingOpsState = {
+  attendance: [],
+  roles: [
+    { id: 'r1', roleName: 'Toastmaster of the Evening', personType: 'member', personId: '' },
+    { id: 'r2', roleName: 'Timer', personType: 'member', personId: '' },
+    { id: 'r3', roleName: 'Ah Counter', personType: 'member', personId: '' },
+    { id: 'r4', roleName: 'Grammarian', personType: 'member', personId: '' },
+    { id: 'r5', roleName: 'General Evaluator', personType: 'member', personId: '' },
+  ],
+}
+
 export function loadLocalState() {
   try {
     const saved = localStorage.getItem(TM_VOTE_STORAGE_KEY)
@@ -164,6 +175,19 @@ export function loadLocalPeople() {
 
 export function saveLocalPeople(next) {
   localStorage.setItem(`${TM_VOTE_STORAGE_KEY}-people`, JSON.stringify(next))
+}
+
+export function loadLocalMeetingOps() {
+  try {
+    const saved = localStorage.getItem(`${TM_VOTE_STORAGE_KEY}-meeting-ops`)
+    return saved ? JSON.parse(saved) : seedMeetingOpsState
+  } catch {
+    return seedMeetingOpsState
+  }
+}
+
+export function saveLocalMeetingOps(next) {
+  localStorage.setItem(`${TM_VOTE_STORAGE_KEY}-meeting-ops`, JSON.stringify(next))
 }
 
 export async function loadPeopleState() {
@@ -244,6 +268,94 @@ export async function savePeopleState(state) {
       .insert(guestRows)
 
     if (guestInsertError) throw guestInsertError
+  }
+
+  return { source: 'cloud' }
+}
+
+export async function loadMeetingOpsState(meetingId = '') {
+  if (!isCloudConfigured) {
+    return { data: loadLocalMeetingOps(), source: 'local' }
+  }
+
+  const user = await getCurrentUser()
+  if (!user) {
+    return { data: loadLocalMeetingOps(), source: 'local' }
+  }
+
+  const activeMeetingId = meetingId || getMeetingId(user.id)
+  const [{ data: attendance, error: attendanceError }, { data: roles, error: rolesError }] = await Promise.all([
+    supabase
+      .from('tm_meeting_attendance')
+      .select('*')
+      .eq('owner_id', user.id)
+      .eq('meeting_id', activeMeetingId),
+    supabase
+      .from('tm_meeting_roles')
+      .select('*')
+      .eq('owner_id', user.id)
+      .eq('meeting_id', activeMeetingId)
+      .order('created_at', { ascending: true }),
+  ])
+
+  if (attendanceError) throw attendanceError
+  if (rolesError) throw rolesError
+
+  return {
+    data: {
+      attendance: attendance.map(fromAttendanceRow),
+      roles: roles.length ? roles.map(fromRoleRow) : seedMeetingOpsState.roles,
+    },
+    source: 'cloud',
+  }
+}
+
+export async function saveMeetingOpsState(state) {
+  if (!isCloudConfigured) {
+    saveLocalMeetingOps(state)
+    return { source: 'local' }
+  }
+
+  const user = await getCurrentUser()
+  if (!user) {
+    saveLocalMeetingOps(state)
+    return { source: 'local' }
+  }
+
+  const meetingId = getMeetingId(user.id)
+  const attendanceRows = state.attendance.map(item => toAttendanceRow(item, user.id, meetingId))
+  const roleRows = state.roles.map(item => toRoleRow(item, user.id, meetingId))
+
+  const { error: attendanceDeleteError } = await supabase
+    .from('tm_meeting_attendance')
+    .delete()
+    .eq('owner_id', user.id)
+    .eq('meeting_id', meetingId)
+
+  if (attendanceDeleteError) throw attendanceDeleteError
+
+  if (attendanceRows.length) {
+    const { error: attendanceInsertError } = await supabase
+      .from('tm_meeting_attendance')
+      .insert(attendanceRows)
+
+    if (attendanceInsertError) throw attendanceInsertError
+  }
+
+  const { error: rolesDeleteError } = await supabase
+    .from('tm_meeting_roles')
+    .delete()
+    .eq('owner_id', user.id)
+    .eq('meeting_id', meetingId)
+
+  if (rolesDeleteError) throw rolesDeleteError
+
+  if (roleRows.length) {
+    const { error: rolesInsertError } = await supabase
+      .from('tm_meeting_roles')
+      .insert(roleRows)
+
+    if (rolesInsertError) throw rolesInsertError
   }
 
   return { source: 'cloud' }
@@ -513,5 +625,43 @@ function fromGuestRow(row) {
     introducedBy: row.introduced_by || '',
     visitDate: row.visit_date || '',
     notes: row.notes || '',
+  }
+}
+
+function toAttendanceRow(item, ownerId, meetingId) {
+  return {
+    owner_id: ownerId,
+    meeting_id: meetingId,
+    person_type: item.personType,
+    person_id: item.personId,
+    attended: item.attended,
+  }
+}
+
+function fromAttendanceRow(row) {
+  return {
+    id: row.id,
+    personType: row.person_type,
+    personId: row.person_id,
+    attended: row.attended,
+  }
+}
+
+function toRoleRow(item, ownerId, meetingId) {
+  return {
+    owner_id: ownerId,
+    meeting_id: meetingId,
+    role_name: item.roleName,
+    person_type: item.personType,
+    person_id: item.personId,
+  }
+}
+
+function fromRoleRow(row) {
+  return {
+    id: row.id,
+    roleName: row.role_name,
+    personType: row.person_type,
+    personId: row.person_id,
   }
 }

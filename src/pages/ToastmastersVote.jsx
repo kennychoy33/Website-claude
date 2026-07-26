@@ -5,12 +5,14 @@ import {
   getCurrentUser,
   hasLocalVote,
   isCloudConfigured,
+  loadMeetingOpsState,
   loadPeopleState,
   loadLocalState,
   loadVoteState,
   markLocalVoted,
   onAuthChange,
   saveVoteState,
+  saveMeetingOpsState,
   savePeopleState,
   signInWithEmail,
   signOutUser,
@@ -23,6 +25,7 @@ const LANG = {
   zh: {
     navAdmin: '投票设置',
     navPeople: '会员嘉宾',
+    navMeeting: '例会管理',
     navVote: '投票页面',
     navShare: '分享海报',
     navResults: '结果统计',
@@ -121,10 +124,26 @@ const LANG = {
     inactive: 'Inactive',
     importMembers: '从会员资料带入',
     peopleSaved: '会员/嘉宾已保存',
+    meetingSaved: '例会资料已保存',
+    attendanceTitle: '出席记录',
+    rolesTitle: '职务分配',
+    agendaTitle: '例会表',
+    printAgenda: '列印例会表',
+    attended: '出席',
+    absent: '缺席',
+    role: '职务',
+    assignee: '担任者',
+    addRole: '+ 添加职务',
+    member: '会员',
+    guest: '嘉宾',
+    preparedSpeakers: '备稿讲员',
+    evaluators: '评估员',
+    tableTopics: '即席讲员',
   },
   en: {
     navAdmin: 'Setup',
     navPeople: 'Members & Guests',
+    navMeeting: 'Meeting & Agenda',
     navVote: 'Voting Page',
     navShare: 'Share Poster',
     navResults: 'Results',
@@ -223,6 +242,21 @@ const LANG = {
     inactive: 'Inactive',
     importMembers: 'Import from Members',
     peopleSaved: 'Members / guests saved',
+    meetingSaved: 'Meeting details saved',
+    attendanceTitle: 'Attendance',
+    rolesTitle: 'Role Assignment',
+    agendaTitle: 'Agenda',
+    printAgenda: 'Print Agenda',
+    attended: 'Attended',
+    absent: 'Absent',
+    role: 'Role',
+    assignee: 'Assignee',
+    addRole: '+ Add Role',
+    member: 'Member',
+    guest: 'Guest',
+    preparedSpeakers: 'Prepared Speakers',
+    evaluators: 'Evaluators',
+    tableTopics: 'Table Topics',
   },
 }
 
@@ -829,6 +863,163 @@ function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
   )
 }
 
+function personLabel(people, type, id) {
+  const list = type === 'guest' ? people.guests : people.members
+  return list.find(item => item.id === id)?.name || ''
+}
+
+function PersonSelect({ people, personType, personId, onChange, t }) {
+  const list = personType === 'guest' ? people.guests : people.members
+
+  return (
+    <div className="tm-person-select">
+      <select value={personType} onChange={event => onChange(event.target.value, '')}>
+        <option value="member">{t.member}</option>
+        <option value="guest">{t.guest}</option>
+      </select>
+      <select value={personId} onChange={event => onChange(personType, event.target.value)}>
+        <option value="">{t.name}</option>
+        {list.map(item => (
+          <option key={item.id} value={item.id}>{item.name}</option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+function MeetingView({ data, people, meetingOps, setMeetingOps, persistMeetingOps, syncStatus, t }) {
+  const attendanceIndex = new Map(meetingOps.attendance.map(item => [`${item.personType}:${item.personId}`, item.attended]))
+  const attendanceRows = [
+    ...people.members.map(item => ({ personType: 'member', personId: item.id, name: item.name })),
+    ...people.guests.map(item => ({ personType: 'guest', personId: item.id, name: item.name })),
+  ].filter(item => item.name)
+
+  function updateAttendance(personType, personId, attended) {
+    const key = `${personType}:${personId}`
+    const existing = meetingOps.attendance.find(item => `${item.personType}:${item.personId}` === key)
+    const nextAttendance = existing
+      ? meetingOps.attendance.map(item => `${item.personType}:${item.personId}` === key ? { ...item, attended } : item)
+      : [...meetingOps.attendance, { personType, personId, attended }]
+    setMeetingOps({ ...meetingOps, attendance: nextAttendance })
+  }
+
+  function updateRole(id, field, value) {
+    setMeetingOps({
+      ...meetingOps,
+      roles: meetingOps.roles.map(item => item.id === id ? { ...item, [field]: value } : item),
+    })
+  }
+
+  function updateRolePerson(id, personType, personId) {
+    setMeetingOps({
+      ...meetingOps,
+      roles: meetingOps.roles.map(item => item.id === id ? { ...item, personType, personId } : item),
+    })
+  }
+
+  function addRole() {
+    setMeetingOps({
+      ...meetingOps,
+      roles: [...meetingOps.roles, { id: `r${Date.now()}`, roleName: '', personType: 'member', personId: '' }],
+    })
+  }
+
+  function removeRole(id) {
+    setMeetingOps({ ...meetingOps, roles: meetingOps.roles.filter(item => item.id !== id) })
+  }
+
+  return (
+    <div className="tm-main-column">
+      <div className="tm-screen-head no-print">
+        <div>
+          <h1>{t.navMeeting}</h1>
+          <p>{data.meeting.number} {t.regularMeeting} | {data.meeting.date}</p>
+          {syncStatus && <div className="tm-sync-badge"><b>{syncStatus}</b></div>}
+        </div>
+        <div className="tm-actions">
+          <button className="tm-gold" onClick={() => persistMeetingOps(meetingOps)}>{t.save}</button>
+          <button onClick={addRole}>{t.addRole}</button>
+          <button onClick={() => window.print()}>{t.printAgenda}</button>
+        </div>
+      </div>
+
+      <section className="tm-panel no-print">
+        <div className="tm-panel-title">
+          <span className="tm-icon">✓</span>
+          <h2>{t.attendanceTitle}</h2>
+        </div>
+        <div className="tm-attendance-grid">
+          {attendanceRows.map(item => {
+            const checked = attendanceIndex.get(`${item.personType}:${item.personId}`) !== false
+            return (
+              <label key={`${item.personType}-${item.personId}`} className="tm-attendance-item">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={event => updateAttendance(item.personType, item.personId, event.target.checked)}
+                />
+                <span>{item.name}</span>
+                <small>{item.personType === 'guest' ? t.guest : t.member}</small>
+              </label>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="tm-panel no-print">
+        <div className="tm-panel-title">
+          <span className="tm-icon">▦</span>
+          <h2>{t.rolesTitle}</h2>
+        </div>
+        <div className="tm-role-table">
+          <div className="tm-role-head">
+            <span>{t.role}</span>
+            <span>{t.assignee}</span>
+            <span>{t.action}</span>
+          </div>
+          {meetingOps.roles.map(item => (
+            <div className="tm-role-row" key={item.id}>
+              <input value={item.roleName} onChange={event => updateRole(item.id, 'roleName', event.target.value)} />
+              <PersonSelect
+                people={people}
+                personType={item.personType}
+                personId={item.personId}
+                onChange={(personType, personId) => updateRolePerson(item.id, personType, personId)}
+                t={t}
+              />
+              <button className="tm-danger" onClick={() => removeRole(item.id)}>{t.remove}</button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="tm-agenda-print">
+        <header>
+          <h1>{t.club}</h1>
+          <h2>{data.meeting.number} {t.regularMeeting}</h2>
+          <p>{data.meeting.date} | {data.meeting.theme} | {t.word}: {data.meeting.word}</p>
+        </header>
+        <div className="tm-agenda-columns">
+          <div>
+            <h3>{t.rolesTitle}</h3>
+            {meetingOps.roles.map(item => (
+              <p key={item.id}><b>{item.roleName || t.role}</b>: {personLabel(people, item.personType, item.personId) || t.pending}</p>
+            ))}
+          </div>
+          <div>
+            <h3>{t.preparedSpeakers}</h3>
+            {data.prepared.map(item => <p key={item.id}><b>{item.name || t.pending}</b>: {item.title || t.pending}</p>)}
+            <h3>{t.evaluators}</h3>
+            {data.evaluator.map(item => <p key={item.id}>{item.name || t.pending}</p>)}
+            <h3>{t.tableTopics}</h3>
+            {data.impromptu.map(item => <p key={item.id}>{item.name || t.pending}</p>)}
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
 function normalizeState(next) {
   return {
     ...next,
@@ -894,6 +1085,7 @@ function LoginView({ lang, setLang, t, onLogin }) {
 export default function ToastmastersVote() {
   const [data, setData] = useState(null)
   const [people, setPeople] = useState({ members: [], guests: [] })
+  const [meetingOps, setMeetingOps] = useState({ attendance: [], roles: [] })
   const publicView = new URLSearchParams(window.location.search).get('view') === 'vote'
   const publicSpace = new URLSearchParams(window.location.search).get('space') || ''
   const [view, setView] = useState(publicView ? 'vote' : 'admin')
@@ -961,6 +1153,21 @@ export default function ToastmastersVote() {
     return () => { ignore = true }
   }, [authReady, user, publicView])
 
+  useEffect(() => {
+    let ignore = false
+    async function hydrateMeetingOps() {
+      if (publicView || !authReady || (isCloudConfigured && !user) || !data?.meeting?.id) return
+      try {
+        const result = await loadMeetingOpsState(data.meeting.id)
+        if (!ignore) setMeetingOps(result.data)
+      } catch {
+        if (!ignore) setMeetingOps({ attendance: [], roles: [] })
+      }
+    }
+    hydrateMeetingOps()
+    return () => { ignore = true }
+  }, [authReady, user, publicView, data?.meeting?.id])
+
   function changeLang(nextLang) {
     setLang(nextLang)
     localStorage.setItem('tm-vote-lang', nextLang)
@@ -987,6 +1194,16 @@ export default function ToastmastersVote() {
     }
   }
 
+  async function persistMeetingOps(next) {
+    setSyncStatus(t.syncing)
+    try {
+      await saveMeetingOpsState(next)
+      setSyncStatus(t.meetingSaved)
+    } catch {
+      setSyncStatus(t.saveFailed)
+    }
+  }
+
   async function handleLogout() {
     await signOutUser()
     setUser(null)
@@ -996,6 +1213,7 @@ export default function ToastmastersVote() {
   const nav = useMemo(() => [
     ['admin', t.navAdmin],
     ['people', t.navPeople],
+    ['meeting', t.navMeeting],
     ['vote', t.navVote],
     ['share', t.navShare],
     ['results', t.navResults],
@@ -1037,6 +1255,7 @@ export default function ToastmastersVote() {
       <main className="tm-content">
         {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={t} people={people} />}
         {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={t} />}
+        {view === 'meeting' && <MeetingView data={data} people={people} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={t} />}
         {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={t} />}
         {view === 'success' && <div className="tm-success-card"><h1>{t.thankVote}</h1><p>{t.recorded}</p></div>}
         {view === 'share' && <SharePoster data={data} t={t} />}
