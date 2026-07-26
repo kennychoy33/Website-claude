@@ -536,6 +536,22 @@
   background: white;
 }
 
+.tm-role-import {
+  margin: -4px 0 16px;
+  max-width: 360px;
+}
+
+.tm-role-import select {
+  width: 100%;
+  border: 1px solid #c8d7e8;
+  border-radius: 8px;
+  padding: 12px 13px;
+  font: inherit;
+  font-weight: 800;
+  color: var(--tm-ink);
+  background: white;
+}
+
 .tm-table {
   border: 1px solid var(--tm-line);
   border-radius: 8px;

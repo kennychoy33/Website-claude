@@ -127,6 +127,8 @@ const LANG = {
     active: 'Active',
     inactive: 'Inactive',
     importMembers: '从会员资料带入',
+    syncFromRoles: '同步当前例会职务',
+    importRole: '导入例会职务',
     peopleSaved: '会员/嘉宾已保存',
     meetingSaved: '例会资料已保存',
     attendanceTitle: '出席记录',
@@ -285,6 +287,8 @@ const LANG = {
     active: 'Active',
     inactive: 'Inactive',
     importMembers: 'Import from Members',
+    syncFromRoles: 'Sync Current Meeting Roles',
+    importRole: 'Import Meeting Role',
     peopleSaved: 'Members / guests saved',
     meetingSaved: 'Meeting details saved',
     attendanceTitle: 'Attendance',
@@ -424,10 +428,18 @@ function CandidateNamePicker({ item, members, onSelectMember, onTypeOther, t }) 
   )
 }
 
-function CandidateEditor({ type, candidates, onChange, t, people }) {
+function roleMatchesCandidateType(roleName, type) {
+  if (type === 'prepared') return /prepared speaker/i.test(roleName)
+  if (type === 'impromptu') return /table topics speaker/i.test(roleName)
+  if (type === 'evaluator') return /^evaluator\b/i.test(roleName)
+  return false
+}
+
+function CandidateEditor({ type, candidates, onChange, t, people, meetingRoles = [] }) {
   const isPrepared = type === 'prepared'
   const title = isPrepared ? t.prepared : type === 'evaluator' ? t.evaluator : t.impromptu
   const activeMembers = (people?.members || []).filter(member => member.status !== 'inactive' && member.name)
+  const candidateRoles = meetingRoles.filter(role => roleMatchesCandidateType(role.roleName, type))
 
   function update(id, field, value) {
     onChange(candidates.map(item => item.id === id ? { ...item, [field]: value } : item))
@@ -453,6 +465,21 @@ function CandidateEditor({ type, candidates, onChange, t, people }) {
     ])
   }
 
+  function addFromRole(roleId) {
+    const role = candidateRoles.find(item => item.id === roleId)
+    if (!role) return
+    const name = personLabel(people, role.personType, role.personId)
+    if (!name) return
+    const nextId = `${type[0]}${Date.now()}`
+    const candidate = isPrepared
+      ? { id: nextId, name, title: '', project: '', votes: 0 }
+      : { id: nextId, name, votes: 0 }
+    onChange([
+      ...candidates.filter(item => item.name !== name),
+      candidate,
+    ])
+  }
+
   function remove(id) {
     onChange(candidates.filter(item => item.id !== id))
   }
@@ -462,6 +489,19 @@ function CandidateEditor({ type, candidates, onChange, t, people }) {
       <div className="tm-panel-title">
         <span className="tm-icon">{isPrepared ? '🏆' : '🎤'}</span>
         <h2>{title}</h2>
+      </div>
+      <div className="tm-role-import">
+        <select value="" onChange={event => addFromRole(event.target.value)}>
+          <option value="">{t.importRole}</option>
+          {candidateRoles.map(role => {
+            const name = personLabel(people, role.personType, role.personId)
+            return (
+              <option key={role.id} value={role.id}>
+                {role.roleName}{name ? ` - ${name}` : ''}
+              </option>
+            )
+          })}
+        </select>
       </div>
 
       {isPrepared ? (
@@ -511,7 +551,7 @@ function CandidateEditor({ type, candidates, onChange, t, people }) {
   )
 }
 
-function AdminView({ data, setData, setView, persistState, source, syncStatus, t, people }) {
+function AdminView({ data, setData, setView, persistState, source, syncStatus, t, people, meetingOps }) {
   function updateMeeting(field, value) {
     setData({ ...data, meeting: { ...data.meeting, [field]: value } })
   }
@@ -549,6 +589,10 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
     setData(next)
   }
 
+  function syncFromMeetingRoles() {
+    setData(candidatesFromMeetingRoles(meetingOps.roles, people, data))
+  }
+
   const savedVotes =
     data.prepared.reduce((sum, item) => sum + item.votes, 0) +
     data.impromptu.reduce((sum, item) => sum + item.votes, 0) +
@@ -566,6 +610,7 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
           <div className="tm-actions">
             <button onClick={() => persistState(data)}>{t.save}</button>
             <button onClick={importFromMembers}>{t.importMembers}</button>
+            <button onClick={syncFromMeetingRoles}>{t.syncFromRoles}</button>
             <button className="tm-gold" onClick={() => setStatus('open')}>{t.openVote}</button>
             <button onClick={() => setView('vote')}>{t.preview}</button>
           </div>
@@ -592,9 +637,9 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
           </div>
         </section>
 
-        <CandidateEditor type="prepared" candidates={data.prepared} onChange={list => updateCandidates('prepared', list)} t={t} people={people} />
-        <CandidateEditor type="impromptu" candidates={data.impromptu} onChange={list => updateCandidates('impromptu', list)} t={t} people={people} />
-        <CandidateEditor type="evaluator" candidates={data.evaluator} onChange={list => updateCandidates('evaluator', list)} t={t} people={people} />
+        <CandidateEditor type="prepared" candidates={data.prepared} onChange={list => updateCandidates('prepared', list)} t={t} people={people} meetingRoles={meetingOps.roles} />
+        <CandidateEditor type="impromptu" candidates={data.impromptu} onChange={list => updateCandidates('impromptu', list)} t={t} people={people} meetingRoles={meetingOps.roles} />
+        <CandidateEditor type="evaluator" candidates={data.evaluator} onChange={list => updateCandidates('evaluator', list)} t={t} people={people} meetingRoles={meetingOps.roles} />
       </div>
 
       <aside className="tm-share-panel">
@@ -1969,7 +2014,7 @@ export default function ToastmastersVote() {
       <main className="tm-content">
         {view === 'system' && <SystemSettingsView settings={settings} setSettings={setSettings} persistSettings={persistSettings} syncStatus={syncStatus} t={appText} />}
         {view === 'master' && <MasterAdminView settings={settings} t={appText} />}
-        {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} />}
+        {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} meetingOps={meetingOps} />}
         {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={appText} />}
         {view === 'meeting' && <MeetingView data={data} setData={setData} persistState={persistState} people={people} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={appText} settings={settings} />}
         {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={appText} />}
