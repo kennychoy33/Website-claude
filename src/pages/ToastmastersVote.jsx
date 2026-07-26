@@ -3,7 +3,9 @@ import QRCode from 'qrcode'
 import {
   getOrCreateVoterToken,
   getCurrentUser,
+  getLocalWorkspaceId,
   getPublicVoteUrl,
+  getRememberedWorkspaceId,
   hasLocalVote,
   isCloudConfigured,
   loadMeetingOpsState,
@@ -13,6 +15,7 @@ import {
   loadVoteState,
   markLocalVoted,
   onAuthChange,
+  rememberWorkspaceId,
   saveVoteState,
   saveMeetingOpsState,
   savePeopleState,
@@ -24,6 +27,16 @@ import {
   submitVote,
 } from '../services/tmVoteCloud'
 import './ToastmastersVote.css'
+
+function getVoteInstanceKey(data, spaceId = '') {
+  const meeting = data?.meeting || {}
+  return [
+    spaceId,
+    meeting.id,
+    meeting.number,
+    meeting.date,
+  ].filter(Boolean).join('|') || 'default'
+}
 
 const LANG = {
   zh: {
@@ -1049,13 +1062,14 @@ function VoteCard({ title, candidates, selected, onSelect, prepared, t }) {
   )
 }
 
-function VoteView({ data, setData, setView, t }) {
+function VoteView({ data, setData, setView, t, spaceId }) {
   const [preparedPick, setPreparedPick] = useState('')
   const [impromptuPick, setImpromptuPick] = useState('')
   const [evaluatorPick, setEvaluatorPick] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const alreadyVoted = hasLocalVote(data.meeting.number)
+  const meetingVoteKey = getVoteInstanceKey(data, spaceId)
+  const alreadyVoted = hasLocalVote(meetingVoteKey)
   const isOpen = ['open', '开放投票', '开放中'].includes(data.meeting.status)
 
   async function handleSubmitVote() {
@@ -1063,10 +1077,10 @@ function VoteView({ data, setData, setView, t }) {
     setSubmitting(true)
     setError('')
     try {
-      const voterToken = getOrCreateVoterToken(data.meeting.number)
+      const voterToken = getOrCreateVoterToken(meetingVoteKey)
       const result = await submitVote(data, preparedPick, impromptuPick, evaluatorPick, voterToken)
       setData(result.data)
-      markLocalVoted(data.meeting.number)
+      markLocalVoted(meetingVoteKey)
       setView('success')
     } catch (err) {
       setError(err.code === 'already_voted' ? t.duplicateVote : t.saveFailed)
@@ -1882,9 +1896,14 @@ export default function ToastmastersVote() {
     club: settings.clubName || t.club,
     clubShort: settings.clubShort || t.clubShort,
   }
+  const workspaceId = user?.id || publicSpace || (isCloudConfigured ? getRememberedWorkspaceId() : getLocalWorkspaceId())
   const effectiveVoteLink = publicView
     ? window.location.href
-    : getPublicVoteUrl(user?.id || '')
+    : getPublicVoteUrl(workspaceId)
+
+  useEffect(() => {
+    if (user?.id) rememberWorkspaceId(user.id)
+  }, [user])
 
   useEffect(() => {
     if (!isCloudConfigured || publicView) return undefined
@@ -2093,10 +2112,10 @@ export default function ToastmastersVote() {
       <main className="tm-content">
         {view === 'system' && <SystemSettingsView settings={settings} setSettings={setSettings} persistSettings={persistSettings} syncStatus={syncStatus} t={appText} />}
         {view === 'master' && <MasterAdminView settings={settings} t={appText} />}
-        {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} meetingOps={meetingOps} spaceId={user?.id || ''} voteLink={effectiveVoteLink} />}
+        {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} meetingOps={meetingOps} spaceId={workspaceId} voteLink={effectiveVoteLink} />}
         {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={appText} />}
         {view === 'meeting' && <MeetingView data={data} setData={setData} persistState={persistState} people={people} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={appText} settings={settings} />}
-        {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={appText} />}
+        {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={appText} spaceId={workspaceId} />}
         {view === 'success' && <div className="tm-success-card"><h1>{appText.thankVote}</h1><p>{appText.recorded}</p></div>}
         {view === 'share' && <SharePoster data={data} t={appText} voteLink={effectiveVoteLink} />}
         {view === 'results' && <ResultsView data={data} t={appText} />}

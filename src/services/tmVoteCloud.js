@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 
 export const TM_VOTE_STORAGE_KEY = 'toastmasters-vote-demo-v5'
 export const TM_VOTE_MEETING_ID = '627'
+const TM_WORKSPACE_STORAGE_KEY = `${TM_VOTE_STORAGE_KEY}-workspace-id`
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -13,12 +14,14 @@ const supabase = isCloudConfigured ? createClient(supabaseUrl, supabaseAnonKey) 
 export async function getCurrentUser() {
   if (!supabase) return null
   const { data } = await supabase.auth.getUser()
+  if (data.user?.id) rememberWorkspaceId(data.user.id)
   return data.user
 }
 
 export function onAuthChange(callback) {
   if (!supabase) return () => {}
   const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (session?.user?.id) rememberWorkspaceId(session.user.id)
     callback(session?.user || null)
   })
   return () => data.subscription.unsubscribe()
@@ -28,6 +31,7 @@ export async function signInWithEmail(email, password) {
   if (!supabase) throw new Error('Supabase is not configured')
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
   if (error) throw error
+  if (data.user?.id) rememberWorkspaceId(data.user.id)
   return data.user
 }
 
@@ -35,7 +39,24 @@ export async function signUpWithEmail(email, password) {
   if (!supabase) throw new Error('Supabase is not configured')
   const { data, error } = await supabase.auth.signUp({ email, password })
   if (error) throw error
+  if (data.user?.id) rememberWorkspaceId(data.user.id)
   return data.user
+}
+
+export function rememberWorkspaceId(spaceId) {
+  if (spaceId) localStorage.setItem(TM_WORKSPACE_STORAGE_KEY, spaceId)
+}
+
+export function getRememberedWorkspaceId() {
+  return localStorage.getItem(TM_WORKSPACE_STORAGE_KEY) || ''
+}
+
+export function getLocalWorkspaceId() {
+  const saved = getRememberedWorkspaceId()
+  if (saved) return saved
+  const id = `local-${crypto.randomUUID()}`
+  rememberWorkspaceId(id)
+  return id
 }
 
 export async function signOutUser() {
@@ -47,8 +68,9 @@ export async function signOutUser() {
 export function getPublicVoteUrl(spaceId = '') {
   const basePath = import.meta.env.BASE_URL || '/'
   const url = new URL(`${basePath.replace(/\/$/, '')}/tm-vote`, window.location.origin)
+  const activeSpace = spaceId || getRememberedWorkspaceId() || getLocalWorkspaceId()
   url.searchParams.set('view', 'vote')
-  if (spaceId) url.searchParams.set('space', spaceId)
+  url.searchParams.set('space', activeSpace)
   return url.toString()
 }
 
@@ -171,14 +193,24 @@ export const seedSystemSettings = {
 export function loadLocalState() {
   try {
     const saved = localStorage.getItem(TM_VOTE_STORAGE_KEY)
-    return saved ? JSON.parse(saved) : seedState
+    const state = saved ? JSON.parse(saved) : seedState
+    return {
+      ...state,
+      meeting: { ...state.meeting, link: getPublicVoteUrl() },
+    }
   } catch {
-    return seedState
+    return {
+      ...seedState,
+      meeting: { ...seedState.meeting, link: getPublicVoteUrl() },
+    }
   }
 }
 
 export function saveLocalState(next) {
-  localStorage.setItem(TM_VOTE_STORAGE_KEY, JSON.stringify(next))
+  localStorage.setItem(TM_VOTE_STORAGE_KEY, JSON.stringify({
+    ...next,
+    meeting: { ...next.meeting, link: getPublicVoteUrl() },
+  }))
 }
 
 export function loadLocalPeople() {
@@ -556,6 +588,7 @@ export async function saveVoteState(state) {
     return { source: 'local' }
   }
 
+  rememberWorkspaceId(user.id)
   const meetingId = getMeetingId(user.id)
   const meeting = { ...state.meeting, id: meetingId, link: getPublicVoteUrl(user.id) }
   const meetingRow = toMeetingRow(meeting, meetingId, user.id)
