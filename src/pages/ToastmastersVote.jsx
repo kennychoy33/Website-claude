@@ -74,6 +74,7 @@ const LANG = {
     thanksJoin: '谢谢参与。每台设备每场会议限投一次。',
     notOpen: '投票尚未开放',
     waitOpen: '请等待会议维护人员开放投票。',
+    missingSpace: '投票链接缺少分会空间，请重新扫描管理员分享的 QR。',
     unnamed: '未命名',
     submit: '提交投票',
     submitting: '提交中...',
@@ -236,6 +237,7 @@ const LANG = {
     thanksJoin: 'Thank you. One vote per device for this meeting.',
     notOpen: 'Voting is not open yet',
     waitOpen: 'Please wait for the meeting admin to open voting.',
+    missingSpace: 'Voting link is missing the club workspace. Please scan the admin QR again.',
     unnamed: 'Unnamed',
     submit: 'Submit Vote',
     submitting: 'Submitting...',
@@ -557,7 +559,7 @@ function CandidateEditor({ type, candidates, onChange, t, people, meetingRoles =
   )
 }
 
-function AdminView({ data, setData, setView, persistState, source, syncStatus, t, people, meetingOps, spaceId }) {
+function AdminView({ data, setData, setView, persistState, source, syncStatus, t, people, meetingOps, spaceId, voteLink }) {
   function updateMeeting(field, value) {
     setData({ ...data, meeting: { ...data.meeting, [field]: value } })
   }
@@ -572,7 +574,7 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
       ...synced,
       meeting: {
         ...synced.meeting,
-        link: getPublicVoteUrl(spaceId),
+        link: voteLink || getPublicVoteUrl(spaceId),
       },
     }
   }
@@ -668,9 +670,9 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
       <aside className="tm-share-panel">
         <h2>{t.voteLink}</h2>
         <p>{t.scanVote}</p>
-        <QrBlock value={data.meeting.link} />
-        <strong>{data.meeting.link}</strong>
-        <button onClick={() => navigator.clipboard?.writeText(data.meeting.link)}>{t.copyLink}</button>
+        <QrBlock value={voteLink} />
+        <strong>{voteLink}</strong>
+        <button onClick={() => navigator.clipboard?.writeText(voteLink)}>{t.copyLink}</button>
         <button className="tm-outline" onClick={() => setView('share')}>{t.downloadPoster}</button>
         <div className="tm-stat-row"><span>{t.preparedCandidates}</span><b>{data.prepared.length}</b></div>
         <div className="tm-stat-row"><span>{t.impromptuCandidates}</span><b>{data.impromptu.length}</b></div>
@@ -1107,7 +1109,7 @@ function VoteView({ data, setData, setView, t }) {
   )
 }
 
-function SharePoster({ data, t }) {
+function SharePoster({ data, t, voteLink }) {
   return (
     <div className="tm-poster-wrap">
       <div className="tm-poster">
@@ -1120,8 +1122,8 @@ function SharePoster({ data, t }) {
         <h2>{data.meeting.number} {t.regularMeeting} | {data.meeting.theme}</h2>
         <div className="tm-poster-qr">
           <span>{t.scanVote}</span>
-          <QrBlock value={data.meeting.link} compact />
-          <b>{data.meeting.link}</b>
+          <QrBlock value={voteLink} compact />
+          <b>{voteLink}</b>
         </div>
         <button>{t.voteNow}</button>
         <div className="tm-poster-items">
@@ -1880,6 +1882,9 @@ export default function ToastmastersVote() {
     club: settings.clubName || t.club,
     clubShort: settings.clubShort || t.clubShort,
   }
+  const effectiveVoteLink = publicView
+    ? window.location.href
+    : getPublicVoteUrl(user?.id || '')
 
   useEffect(() => {
     if (!isCloudConfigured || publicView) return undefined
@@ -2057,6 +2062,19 @@ export default function ToastmastersVote() {
     )
   }
 
+  if (publicView && isCloudConfigured && !publicSpace) {
+    return (
+      <div className="tm-page public">
+        <main className="tm-content">
+          <div className="tm-success-card">
+            <h2>{appText.notOpen}</h2>
+            <p>{appText.missingSpace}</p>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className={`tm-page ${publicView ? 'public' : ''}`}>
       {!publicView && <aside className="tm-sidebar">
@@ -2075,12 +2093,12 @@ export default function ToastmastersVote() {
       <main className="tm-content">
         {view === 'system' && <SystemSettingsView settings={settings} setSettings={setSettings} persistSettings={persistSettings} syncStatus={syncStatus} t={appText} />}
         {view === 'master' && <MasterAdminView settings={settings} t={appText} />}
-        {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} meetingOps={meetingOps} spaceId={user?.id || ''} />}
+        {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} meetingOps={meetingOps} spaceId={user?.id || ''} voteLink={effectiveVoteLink} />}
         {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={appText} />}
         {view === 'meeting' && <MeetingView data={data} setData={setData} persistState={persistState} people={people} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={appText} settings={settings} />}
         {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={appText} />}
         {view === 'success' && <div className="tm-success-card"><h1>{appText.thankVote}</h1><p>{appText.recorded}</p></div>}
-        {view === 'share' && <SharePoster data={data} t={appText} />}
+        {view === 'share' && <SharePoster data={data} t={appText} voteLink={effectiveVoteLink} />}
         {view === 'results' && <ResultsView data={data} t={appText} />}
         {view === 'history' && <HistoryView data={data} t={appText} />}
       </main>

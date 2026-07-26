@@ -268,14 +268,14 @@ export async function loadSystemSettings(spaceId = '') {
 }
 
 export async function saveSystemSettings(settings) {
+  saveLocalSystemSettings(settings)
+
   if (!isCloudConfigured) {
-    saveLocalSystemSettings(settings)
     return { source: 'local' }
   }
 
   const user = await getCurrentUser()
   if (!user) {
-    saveLocalSystemSettings(settings)
     return { source: 'local' }
   }
 
@@ -297,7 +297,6 @@ export async function saveSystemSettings(settings) {
       }, { onConflict: 'owner_id' })
 
     if (minimalError) throw minimalError
-    saveLocalSystemSettings(settings)
     return { source: 'cloud' }
   }
 
