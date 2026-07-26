@@ -226,6 +226,7 @@
 
 .tm-form-grid label,
 .tm-table-row input,
+.tm-table-row select,
 .tm-name-chip input {
   min-width: 0;
 }
@@ -240,6 +241,7 @@
 
 .tm-form-grid input,
 .tm-table-row input,
+.tm-table-row select,
 .tm-name-chip input {
   width: 100%;
   border: 1px solid #cdd8e8;
@@ -248,6 +250,29 @@
   font: inherit;
   font-weight: 700;
   color: var(--tm-ink);
+}
+
+.tm-name-picker {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px;
+  background: white;
+  border-right: 1px solid var(--tm-line);
+}
+
+.tm-name-picker select,
+.tm-name-picker input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #cdd8e8;
+  border-radius: 7px;
+  padding: 9px 10px;
+  font: inherit;
+  font-weight: 800;
+  color: var(--tm-ink);
+  background: white;
 }
 
 .tm-table {
@@ -281,6 +306,10 @@
   border-right: 1px solid var(--tm-line);
 }
 
+.tm-table-row > .tm-name-picker {
+  border-right: 1px solid var(--tm-line);
+}
+
 .tm-danger {
   color: var(--tm-burgundy) !important;
   border: 0 !important;
@@ -309,7 +338,21 @@
   padding: 6px 8px 6px 12px;
 }
 
-.tm-name-chip input {
+.tm-name-chip .tm-name-picker {
+  width: 180px;
+  padding: 0;
+  background: transparent;
+  border-right: 0;
+}
+
+.tm-name-chip .tm-name-picker select,
+.tm-name-chip .tm-name-picker input {
+  border: 0;
+  background: transparent;
+  padding: 7px;
+}
+
+.tm-name-chip > input {
   width: 120px;
   padding: 7px;
   border: 0;

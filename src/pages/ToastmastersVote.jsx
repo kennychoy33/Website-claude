@@ -278,12 +278,53 @@ function SyncBadge({ source, syncStatus, t }) {
   )
 }
 
-function CandidateEditor({ type, candidates, onChange, t }) {
+function CandidateNamePicker({ item, members, onSelectMember, onTypeOther, t }) {
+  const isKnownMember = members.some(member => member.name === item.name)
+  const value = item.name && isKnownMember ? item.name : item.name ? '__other__' : ''
+
+  function handleChange(event) {
+    const nextValue = event.target.value
+    if (nextValue === '__other__') {
+      onTypeOther(item.name && !isKnownMember ? item.name : '')
+      return
+    }
+    const member = members.find(entry => entry.name === nextValue)
+    if (member) onSelectMember(member)
+  }
+
+  return (
+    <div className="tm-name-picker">
+      <select value={value} onChange={handleChange}>
+        <option value="">{t.name}</option>
+        {members.map(member => (
+          <option key={member.id} value={member.name}>{member.name}</option>
+        ))}
+        <option value="__other__">其他 / Other</option>
+      </select>
+      {value === '__other__' && (
+        <input value={item.name} onChange={event => onTypeOther(event.target.value)} placeholder="其他 / Other" />
+      )}
+    </div>
+  )
+}
+
+function CandidateEditor({ type, candidates, onChange, t, people }) {
   const isPrepared = type === 'prepared'
   const title = isPrepared ? t.prepared : type === 'evaluator' ? t.evaluator : t.impromptu
+  const activeMembers = (people?.members || []).filter(member => member.status !== 'inactive' && member.name)
 
   function update(id, field, value) {
     onChange(candidates.map(item => item.id === id ? { ...item, [field]: value } : item))
+  }
+
+  function selectMember(id, member) {
+    onChange(candidates.map(item => {
+      if (item.id !== id) return item
+      const project = [member.pathway, member.level].filter(Boolean).join(' ')
+      return isPrepared
+        ? { ...item, name: member.name, project: project || item.project }
+        : { ...item, name: member.name }
+    }))
   }
 
   function addCandidate() {
@@ -317,7 +358,13 @@ function CandidateEditor({ type, candidates, onChange, t }) {
           </div>
           {candidates.map(item => (
             <div className="tm-table-row" key={item.id}>
-              <input value={item.name} onChange={e => update(item.id, 'name', e.target.value)} />
+              <CandidateNamePicker
+                item={item}
+                members={activeMembers}
+                onSelectMember={member => selectMember(item.id, member)}
+                onTypeOther={value => update(item.id, 'name', value)}
+                t={t}
+              />
               <input value={item.title} onChange={e => update(item.id, 'title', e.target.value)} />
               <input value={item.project} onChange={e => update(item.id, 'project', e.target.value)} />
               <button className="tm-danger" onClick={() => remove(item.id)}>{t.remove}</button>
@@ -328,7 +375,13 @@ function CandidateEditor({ type, candidates, onChange, t }) {
         <div className="tm-chip-editor">
           {candidates.map(item => (
             <label className="tm-name-chip" key={item.id}>
-              <input value={item.name} onChange={e => update(item.id, 'name', e.target.value)} />
+              <CandidateNamePicker
+                item={item}
+                members={activeMembers}
+                onSelectMember={member => selectMember(item.id, member)}
+                onTypeOther={value => update(item.id, 'name', value)}
+                t={t}
+              />
               <button onClick={() => remove(item.id)} aria-label={`Remove ${item.name}`}>x</button>
             </label>
           ))}
@@ -423,9 +476,9 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
           </div>
         </section>
 
-        <CandidateEditor type="prepared" candidates={data.prepared} onChange={list => updateCandidates('prepared', list)} t={t} />
-        <CandidateEditor type="impromptu" candidates={data.impromptu} onChange={list => updateCandidates('impromptu', list)} t={t} />
-        <CandidateEditor type="evaluator" candidates={data.evaluator} onChange={list => updateCandidates('evaluator', list)} t={t} />
+        <CandidateEditor type="prepared" candidates={data.prepared} onChange={list => updateCandidates('prepared', list)} t={t} people={people} />
+        <CandidateEditor type="impromptu" candidates={data.impromptu} onChange={list => updateCandidates('impromptu', list)} t={t} people={people} />
+        <CandidateEditor type="evaluator" candidates={data.evaluator} onChange={list => updateCandidates('evaluator', list)} t={t} people={people} />
       </div>
 
       <aside className="tm-share-panel">
