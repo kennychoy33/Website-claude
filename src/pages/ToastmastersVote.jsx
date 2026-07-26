@@ -169,6 +169,7 @@ const LANG = {
     saveClubList: '保存分会列表',
     clubCreated: '分会已加入',
     clubListSaved: '分会列表已保存',
+    noClub: '还没有分会记录',
     createClubHint: '请填写分会名称、User Name 和 Password',
     clubList: '分会列表',
     newMeeting: '新建例会',
@@ -329,6 +330,7 @@ const LANG = {
     saveClubList: 'Save Club List',
     clubCreated: 'Club added',
     clubListSaved: 'Club list saved',
+    noClub: 'No club records yet',
     createClubHint: 'Please enter club name, user name, and password',
     clubList: 'Club List',
     newMeeting: 'New Meeting',
@@ -560,8 +562,18 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
     setData({ ...data, [field]: list })
   }
 
+  function syncedVoteData(nextData = data) {
+    return candidatesFromMeetingRoles(meetingOps.roles, people, nextData)
+  }
+
+  function saveSetup() {
+    const next = syncedVoteData()
+    setData(next)
+    persistState(next)
+  }
+
   function setStatus(status) {
-    const next = { ...data, meeting: { ...data.meeting, status } }
+    const next = syncedVoteData({ ...data, meeting: { ...data.meeting, status } })
     setData(next)
     persistState(next)
   }
@@ -590,7 +602,7 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
   }
 
   function syncFromMeetingRoles() {
-    setData(candidatesFromMeetingRoles(meetingOps.roles, people, data))
+    setData(syncedVoteData())
   }
 
   const savedVotes =
@@ -608,7 +620,7 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
             <SyncBadge source={source} syncStatus={syncStatus} t={t} />
           </div>
           <div className="tm-actions">
-            <button onClick={() => persistState(data)}>{t.save}</button>
+            <button onClick={saveSetup}>{t.save}</button>
             <button onClick={importFromMembers}>{t.importMembers}</button>
             <button onClick={syncFromMeetingRoles}>{t.syncFromRoles}</button>
             <button className="tm-gold" onClick={() => setStatus('open')}>{t.openVote}</button>
@@ -900,7 +912,17 @@ function MasterAdminView({ settings, t }) {
   }
 
   function saveClubList() {
-    localStorage.setItem('tm-master-clubs', JSON.stringify(clubs))
+    let nextClubs = clubs
+    if (draft.clubName || draft.toastmasterId || draft.username || draft.password || draft.adminName) {
+      if (!draft.clubName || !draft.username || !draft.password) {
+        setMessage(t.createClubHint)
+        return
+      }
+      nextClubs = [...clubs, { ...draft, id: `club${Date.now()}` }]
+      setClubs(nextClubs)
+      setDraft({ clubName: '', toastmasterId: '', username: '', password: '', adminName: '' })
+    }
+    localStorage.setItem('tm-master-clubs', JSON.stringify(nextClubs))
     setMessage(t.clubListSaved)
   }
 
@@ -983,6 +1005,7 @@ function MasterAdminView({ settings, t }) {
               <button className="tm-danger" onClick={() => deleteClub(club.id)}>{t.remove}</button>
             </div>
           ))}
+          {!clubs.length && <div className="tm-empty-row">{t.noClub}</div>}
         </div>
       </section>
       <section className="tm-panel tm-note-panel">
@@ -1409,9 +1432,9 @@ function candidatesFromMeetingRoles(roles, people, existingData) {
 
   return {
     ...existingData,
-    prepared,
-    impromptu,
-    evaluator,
+    prepared: prepared.length ? prepared : existingData.prepared,
+    impromptu: impromptu.length ? impromptu : existingData.impromptu,
+    evaluator: evaluator.length ? evaluator : existingData.evaluator,
   }
 }
 

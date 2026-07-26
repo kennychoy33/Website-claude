@@ -432,6 +432,14 @@
   font-weight: 800;
 }
 
+.tm-empty-row {
+  padding: 18px;
+  color: var(--tm-muted);
+  font-weight: 900;
+  background: white;
+  border-top: 1px solid var(--tm-line);
+}
+
 .tm-file-action {
   display: inline-flex;
   align-items: center;
