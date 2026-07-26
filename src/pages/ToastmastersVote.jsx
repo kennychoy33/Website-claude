@@ -139,6 +139,7 @@ const LANG = {
     roleTime: '时间/分钟',
     assignee: '担任者',
     addRole: '+ 添加职务',
+    resetRoles: '套用完整职务模板',
     member: '会员',
     guest: '嘉宾',
     preparedSpeakers: '备稿讲员',
@@ -163,7 +164,9 @@ const LANG = {
     masterTitle: '系统管理',
     masterSubtitle: '最高管理者用于新建分会、分配 Toastmaster ID、User Name 和初始 Password。',
     createClub: '新建分会',
+    saveClubList: '保存分会列表',
     clubCreated: '分会已加入',
+    clubListSaved: '分会列表已保存',
     createClubHint: '请填写分会名称、User Name 和 Password',
     clubList: '分会列表',
     newMeeting: '新建例会',
@@ -286,6 +289,7 @@ const LANG = {
     roleTime: 'Time / min',
     assignee: 'Assignee',
     addRole: '+ Add Role',
+    resetRoles: 'Apply Full Role Template',
     member: 'Member',
     guest: 'Guest',
     preparedSpeakers: 'Prepared Speakers',
@@ -310,7 +314,9 @@ const LANG = {
     masterTitle: 'System Admin',
     masterSubtitle: 'Owner-only area to create clubs, Toastmaster IDs, user names, and initial passwords.',
     createClub: 'Create Club',
+    saveClubList: 'Save Club List',
     clubCreated: 'Club added',
+    clubListSaved: 'Club list saved',
     createClubHint: 'Please enter club name, user name, and password',
     clubList: 'Club List',
     newMeeting: 'New Meeting',
@@ -822,6 +828,21 @@ function MasterAdminView({ settings, t }) {
     setMessage(t.clubCreated)
   }
 
+  function updateClub(id, field, value) {
+    setClubs(clubs.map(club => club.id === id ? { ...club, [field]: value } : club))
+  }
+
+  function deleteClub(id) {
+    const nextClubs = clubs.filter(club => club.id !== id)
+    setClubs(nextClubs)
+    localStorage.setItem('tm-master-clubs', JSON.stringify(nextClubs))
+  }
+
+  function saveClubList() {
+    localStorage.setItem('tm-master-clubs', JSON.stringify(clubs))
+    setMessage(t.clubListSaved)
+  }
+
   return (
     <div className="tm-main-column">
       <div className="tm-screen-head">
@@ -831,6 +852,7 @@ function MasterAdminView({ settings, t }) {
         </div>
         <div className="tm-actions">
           <button className="tm-gold" onClick={createClub}>{t.createClub}</button>
+          <button onClick={saveClubList}>{t.saveClubList}</button>
         </div>
       </div>
       {message && <div className="tm-sync-badge"><b>{message}</b></div>}
@@ -881,13 +903,23 @@ function MasterAdminView({ settings, t }) {
             <b>{admins.length}</b>
           </div>
         </div>
-        <div className="tm-club-list">
+        <div className="tm-club-table">
+          <div className="tm-club-table-head">
+            <span>{t.clubName}</span>
+            <span>{t.toastmasterId}</span>
+            <span>{t.username}</span>
+            <span>{t.password}</span>
+            <span>{t.adminName}</span>
+            <span>{t.action}</span>
+          </div>
           {clubs.map(club => (
-            <div key={club.id}>
-              <b>{club.clubName}</b>
-              <span>{t.toastmasterId}: {club.toastmasterId || t.pending}</span>
-              <span>{t.username}: {club.username}</span>
-              <span>{t.adminName}: {club.adminName || t.pending}</span>
+            <div className="tm-club-table-row" key={club.id}>
+              <input value={club.clubName} onChange={event => updateClub(club.id, 'clubName', event.target.value)} />
+              <input value={club.toastmasterId} onChange={event => updateClub(club.id, 'toastmasterId', event.target.value)} />
+              <input value={club.username} onChange={event => updateClub(club.id, 'username', event.target.value)} />
+              <input type="password" value={club.password} onChange={event => updateClub(club.id, 'password', event.target.value)} />
+              <input value={club.adminName} onChange={event => updateClub(club.id, 'adminName', event.target.value)} />
+              <button className="tm-danger" onClick={() => deleteClub(club.id)}>{t.remove}</button>
             </div>
           ))}
         </div>
@@ -1255,6 +1287,49 @@ function PersonSelect({ people, personType, personId, onChange, t }) {
   )
 }
 
+function fullToastmastersRoles(settings) {
+  const fallbackRoles = [
+    { roleName: 'Sergeant at Arms', time: '3' },
+    { roleName: 'President Opening', time: '5' },
+    { roleName: 'Invocation / Pledge', time: '2' },
+    { roleName: 'Guest Introduction', time: '5' },
+    { roleName: 'Toastmaster of the Evening', time: '5' },
+    { roleName: 'Timer', time: '3' },
+    { roleName: 'Ah Counter', time: '3' },
+    { roleName: 'Grammarian', time: '5' },
+    { roleName: 'Word of the Day', time: '2' },
+    { roleName: 'Prepared Speaker 1', time: '7' },
+    { roleName: 'Prepared Speaker 2', time: '7' },
+    { roleName: 'Prepared Speaker 3', time: '7' },
+    { roleName: 'Evaluator 1', time: '3' },
+    { roleName: 'Evaluator 2', time: '3' },
+    { roleName: 'Evaluator 3', time: '3' },
+    { roleName: 'Table Topics Master', time: '20' },
+    { roleName: 'Table Topics Speaker 1', time: '2' },
+    { roleName: 'Table Topics Speaker 2', time: '2' },
+    { roleName: 'Table Topics Speaker 3', time: '2' },
+    { roleName: 'Table Topics Speaker 4', time: '2' },
+    { roleName: 'Timer Report', time: '2' },
+    { roleName: 'Ah Counter Report', time: '2' },
+    { roleName: 'Grammarian Report', time: '3' },
+    { roleName: 'General Evaluator', time: '10' },
+    { roleName: 'Awards Presentation', time: '5' },
+    { roleName: 'President Closing', time: '5' },
+  ]
+  const templateRoles = (settings.agendaRoleTemplate || []).filter(Boolean)
+  const sourceRoles = templateRoles.length >= 8 ? templateRoles : fallbackRoles
+  return sourceRoles.map((role, index) => {
+    const templateRole = typeof role === 'string' ? { roleName: role, time: '' } : role
+    return {
+      id: `r${Date.now()}${index}`,
+      roleName: templateRole.roleName,
+      time: templateRole.time || '',
+      personType: 'member',
+      personId: '',
+    }
+  })
+}
+
 function MeetingView({ data, setData, persistState, people, meetingOps, setMeetingOps, persistMeetingOps, syncStatus, t, settings }) {
   const attendanceIndex = new Map(meetingOps.attendance.map(item => [`${item.personType}:${item.personId}`, item.attended]))
   const attendanceRows = [
@@ -1300,27 +1375,12 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
     setMeetingOps({ ...meetingOps, roles: meetingOps.roles.filter(item => item.id !== id) })
   }
 
+  function resetRolesFromTemplate() {
+    setMeetingOps({ ...meetingOps, roles: fullToastmastersRoles(settings) })
+  }
+
   function createMeeting() {
-    const templateRoles = (settings.agendaRoleTemplate || []).filter(Boolean)
-    const roles = (templateRoles.length ? templateRoles : [
-      { roleName: 'Sergeant at Arms', time: '3' },
-      { roleName: 'President Opening', time: '5' },
-      { roleName: 'Toastmaster of the Evening', time: '5' },
-      { roleName: 'Timer', time: '3' },
-      { roleName: 'Ah Counter', time: '3' },
-      { roleName: 'Grammarian', time: '5' },
-      { roleName: 'Table Topics Master', time: '20' },
-      { roleName: 'General Evaluator', time: '10' },
-    ]).map((role, index) => {
-      const templateRole = typeof role === 'string' ? { roleName: role, time: '' } : role
-      return ({
-      id: `r${Date.now()}${index}`,
-      roleName: templateRole.roleName,
-      time: templateRole.time || '',
-      personType: 'member',
-      personId: '',
-    })
-    })
+    const roles = fullToastmastersRoles(settings)
     const currentNumber = String(data.meeting.number || '').match(/\d+/)?.[0]
     const nextNumber = currentNumber ? `第${Number(currentNumber) + 1}次` : ''
     const next = {
@@ -1392,6 +1452,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
           <button onClick={exportExcel}>{t.exportExcel}</button>
           <button onClick={saveMeetingAll}>{t.save}</button>
           <button onClick={addRole}>{t.addRole}</button>
+          <button onClick={resetRolesFromTemplate}>{t.resetRoles}</button>
           <button onClick={() => window.print()}>{t.printAgenda}</button>
         </div>
       </div>
