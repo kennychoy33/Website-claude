@@ -1124,6 +1124,15 @@ function VoteView({ data, setData, setView, t, spaceId }) {
 }
 
 function SharePoster({ data, t, voteLink }) {
+  if (!isCloudConfigured) {
+    return (
+      <div className="tm-success-card">
+        <h2>云端未连接</h2>
+        <p>请先在 GitHub repository secrets 设置 VITE_SUPABASE_URL 和 VITE_SUPABASE_ANON_KEY，再重新部署，QR 才会和后台资料同步。</p>
+      </div>
+    )
+  }
+
   return (
     <div className="tm-poster-wrap">
       <div className="tm-poster">
@@ -2088,6 +2097,19 @@ export default function ToastmastersVote() {
           <div className="tm-success-card">
             <h2>{appText.notOpen}</h2>
             <p>{appText.missingSpace}</p>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  if (publicView && !isCloudConfigured) {
+    return (
+      <div className="tm-page public">
+        <main className="tm-content">
+          <div className="tm-success-card">
+            <h2>云端未连接</h2>
+            <p>这个投票链接目前没有连接数据库，请联系会议维护人员重新发布云端版 QR。</p>
           </div>
         </main>
       </div>
