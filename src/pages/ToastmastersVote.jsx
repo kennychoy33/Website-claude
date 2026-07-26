@@ -155,11 +155,14 @@ const LANG = {
     masterNote: '系统管理是给最高管理者新建分会、分会管理者 ID 和密码使用。',
     logoUpload: '上传分会 Logo',
     agendaTemplate: '上传例会表 Template',
+    agendaRoleTemplate: '例会表职务模板',
+    addTemplateRole: '+ 加入模板职务',
     clubAdmins: '分会管理者',
     addClubAdmin: '+ 加入管理者',
     masterTitle: '系统管理',
     masterSubtitle: '最高管理者用于新建分会、分配 Toastmaster ID、User Name 和初始 Password。',
     createClub: '新建分会',
+    clubList: '分会列表',
     newMeeting: '新建例会',
     importAgenda: '导入例会表 / Excel',
     exportExcel: '导出 Excel',
@@ -296,11 +299,14 @@ const LANG = {
     masterNote: 'System Admin is for the owner to create clubs, club admin IDs, and initial passwords.',
     logoUpload: 'Upload Club Logo',
     agendaTemplate: 'Upload Agenda Template',
+    agendaRoleTemplate: 'Agenda Role Template',
+    addTemplateRole: '+ Add Template Role',
     clubAdmins: 'Club Admins',
     addClubAdmin: '+ Add Admin',
     masterTitle: 'System Admin',
     masterSubtitle: 'Owner-only area to create clubs, Toastmaster IDs, user names, and initial passwords.',
     createClub: 'Create Club',
+    clubList: 'Club List',
     newMeeting: 'New Meeting',
     importAgenda: 'Import Agenda / Excel',
     exportExcel: 'Export Excel',
@@ -609,6 +615,26 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
     })
   }
 
+  function updateTemplateRole(index, value) {
+    const nextRoles = [...(settings.agendaRoleTemplate || [])]
+    nextRoles[index] = value
+    setSettings({ ...settings, agendaRoleTemplate: nextRoles })
+  }
+
+  function addTemplateRole() {
+    setSettings({
+      ...settings,
+      agendaRoleTemplate: [...(settings.agendaRoleTemplate || []), ''],
+    })
+  }
+
+  function removeTemplateRole(index) {
+    setSettings({
+      ...settings,
+      agendaRoleTemplate: (settings.agendaRoleTemplate || []).filter((_, currentIndex) => currentIndex !== index),
+    })
+  }
+
   function readFile(event, field, nameField = '') {
     const file = event.target.files?.[0]
     if (!file) return
@@ -691,6 +717,23 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
 
       <section className="tm-panel">
         <div className="tm-panel-title">
+          <span className="tm-icon">☷</span>
+          <h2>{t.agendaRoleTemplate}</h2>
+        </div>
+        <div className="tm-template-roles">
+          {(settings.agendaRoleTemplate || []).map((role, index) => (
+            <div key={`${role}-${index}`} className="tm-template-role-row">
+              <span>{index + 1}</span>
+              <input value={role} onChange={event => updateTemplateRole(index, event.target.value)} />
+              <button className="tm-danger" onClick={() => removeTemplateRole(index)}>{t.remove}</button>
+            </div>
+          ))}
+        </div>
+        <button className="tm-outline" onClick={addTemplateRole}>{t.addTemplateRole}</button>
+      </section>
+
+      <section className="tm-panel">
+        <div className="tm-panel-title">
           <span className="tm-icon">👤</span>
           <h2>{t.clubAdmins}</h2>
         </div>
@@ -725,6 +768,27 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
 
 function MasterAdminView({ settings, t }) {
   const admins = settings.clubAdmins || []
+  const [clubs, setClubs] = useState([])
+  const [draft, setDraft] = useState({
+    clubName: '',
+    toastmasterId: '',
+    username: '',
+    password: '',
+    adminName: '',
+  })
+
+  function updateDraft(field, value) {
+    setDraft({ ...draft, [field]: value })
+  }
+
+  function createClub() {
+    if (!draft.clubName || !draft.username || !draft.password) return
+    setClubs([
+      ...clubs,
+      { ...draft, id: `club${Date.now()}` },
+    ])
+    setDraft({ clubName: '', toastmasterId: '', username: '', password: '', adminName: '' })
+  }
 
   return (
     <div className="tm-main-column">
@@ -734,13 +798,41 @@ function MasterAdminView({ settings, t }) {
           <p>{t.masterSubtitle}</p>
         </div>
         <div className="tm-actions">
-          <button className="tm-gold">{t.createClub}</button>
+          <button className="tm-gold" onClick={createClub}>{t.createClub}</button>
         </div>
       </div>
       <section className="tm-panel">
         <div className="tm-panel-title">
+          <span className="tm-icon">＋</span>
+          <h2>{t.createClub}</h2>
+        </div>
+        <div className="tm-form-grid">
+          <label>
+            <span>{t.clubName}</span>
+            <input value={draft.clubName} onChange={event => updateDraft('clubName', event.target.value)} />
+          </label>
+          <label>
+            <span>{t.toastmasterId}</span>
+            <input value={draft.toastmasterId} onChange={event => updateDraft('toastmasterId', event.target.value)} />
+          </label>
+          <label>
+            <span>{t.username}</span>
+            <input value={draft.username} onChange={event => updateDraft('username', event.target.value)} />
+          </label>
+          <label>
+            <span>{t.password}</span>
+            <input type="password" value={draft.password} onChange={event => updateDraft('password', event.target.value)} />
+          </label>
+          <label>
+            <span>{t.adminName}</span>
+            <input value={draft.adminName} onChange={event => updateDraft('adminName', event.target.value)} />
+          </label>
+        </div>
+      </section>
+      <section className="tm-panel">
+        <div className="tm-panel-title">
           <span className="tm-icon">☷</span>
-          <h2>{t.clubAdmins}</h2>
+          <h2>{t.clubList}</h2>
         </div>
         <div className="tm-master-list">
           <div>
@@ -755,6 +847,16 @@ function MasterAdminView({ settings, t }) {
             <span>{t.clubAdmins}</span>
             <b>{admins.length}</b>
           </div>
+        </div>
+        <div className="tm-club-list">
+          {clubs.map(club => (
+            <div key={club.id}>
+              <b>{club.clubName}</b>
+              <span>{t.toastmasterId}: {club.toastmasterId || t.pending}</span>
+              <span>{t.username}: {club.username}</span>
+              <span>{t.adminName}: {club.adminName || t.pending}</span>
+            </div>
+          ))}
         </div>
       </section>
       <section className="tm-panel tm-note-panel">
@@ -1162,6 +1264,19 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
   }
 
   function createMeeting() {
+    const templateRoles = (settings.agendaRoleTemplate || []).filter(Boolean)
+    const roles = (templateRoles.length ? templateRoles : [
+      'Toastmaster of the Evening',
+      'Timer',
+      'Ah Counter',
+      'Grammarian',
+      'General Evaluator',
+    ]).map((roleName, index) => ({
+      id: `r${Date.now()}${index}`,
+      roleName,
+      personType: 'member',
+      personId: '',
+    }))
     const next = {
       ...data,
       meeting: {
@@ -1181,13 +1296,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
     setData(next)
     setMeetingOps({
       attendance: [],
-      roles: [
-        { id: `r${Date.now()}1`, roleName: 'Toastmaster of the Evening', personType: 'member', personId: '' },
-        { id: `r${Date.now()}2`, roleName: 'Timer', personType: 'member', personId: '' },
-        { id: `r${Date.now()}3`, roleName: 'Ah Counter', personType: 'member', personId: '' },
-        { id: `r${Date.now()}4`, roleName: 'Grammarian', personType: 'member', personId: '' },
-        { id: `r${Date.now()}5`, roleName: 'General Evaluator', personType: 'member', personId: '' },
-      ],
+      roles,
     })
   }
 
@@ -1224,13 +1333,13 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
           {syncStatus && <div className="tm-sync-badge"><b>{syncStatus}</b></div>}
         </div>
         <div className="tm-actions">
-          <button onClick={createMeeting}>{t.newMeeting}</button>
+          <button className="tm-gold" onClick={createMeeting}>{t.newMeeting}</button>
           <label className="tm-file-action">
             {t.importAgenda}
             <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv" onChange={importAgendaFile} />
           </label>
           <button onClick={exportExcel}>{t.exportExcel}</button>
-          <button className="tm-gold" onClick={() => persistMeetingOps(meetingOps)}>{t.save}</button>
+          <button onClick={() => persistMeetingOps(meetingOps)}>{t.save}</button>
           <button onClick={() => persistState(data)}>{t.save}</button>
           <button onClick={addRole}>{t.addRole}</button>
           <button onClick={() => window.print()}>{t.printAgenda}</button>

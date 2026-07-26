@@ -160,6 +160,20 @@ export const seedSystemSettings = {
   logoDataUrl: '',
   agendaTemplateName: '',
   agendaTemplateDataUrl: '',
+  agendaRoleTemplate: [
+    'Sergeant at Arms',
+    'President Opening',
+    'Toastmaster of the Evening',
+    'Timer',
+    'Ah Counter',
+    'Grammarian',
+    'Prepared Speaker 1',
+    'Prepared Speaker 2',
+    'Evaluator 1',
+    'Evaluator 2',
+    'Table Topics Master',
+    'General Evaluator',
+  ],
   clubAdmins: [
     { id: 'a1', toastmasterId: '', username: '', password: '', name: '' },
   ],
@@ -777,6 +791,7 @@ function toSystemSettingsRow(settings, ownerId) {
     logo_data_url: settings.logoDataUrl,
     agenda_template_name: settings.agendaTemplateName,
     agenda_template_data_url: settings.agendaTemplateDataUrl,
+    agenda_role_template: settings.agendaRoleTemplate || [],
     updated_at: new Date().toISOString(),
   }
 }
@@ -791,6 +806,7 @@ function fromSystemSettingsRow(row) {
     logoDataUrl: row.logo_data_url || '',
     agendaTemplateName: row.agenda_template_name || '',
     agendaTemplateDataUrl: row.agenda_template_data_url || '',
+    agendaRoleTemplate: row.agenda_role_template || seedSystemSettings.agendaRoleTemplate,
   }
 }
 

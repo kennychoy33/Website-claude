@@ -329,6 +329,62 @@
   font-size: 20px;
 }
 
+.tm-template-roles {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.tm-template-role-row {
+  display: grid;
+  grid-template-columns: 46px 1fr 90px;
+  align-items: center;
+  border: 1px solid var(--tm-line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.tm-template-role-row span {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  background: #f2f6fb;
+  color: var(--tm-muted);
+  font-weight: 900;
+}
+
+.tm-template-role-row input {
+  border: 0;
+  border-left: 1px solid var(--tm-line);
+  border-right: 1px solid var(--tm-line);
+  border-radius: 0;
+  padding: 13px;
+  font: inherit;
+  font-weight: 800;
+}
+
+.tm-club-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.tm-club-list div {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 10px;
+  border: 1px solid var(--tm-line);
+  border-radius: 8px;
+  padding: 14px;
+  background: white;
+  font-weight: 800;
+}
+
+.tm-club-list span {
+  color: var(--tm-muted);
+}
+
 .tm-file-action {
   display: inline-flex;
   align-items: center;
@@ -1160,8 +1216,17 @@
   }
 
   .tm-upload-grid,
-  .tm-master-list {
+  .tm-master-list,
+  .tm-club-list div {
     grid-template-columns: 1fr;
+  }
+
+  .tm-template-role-row {
+    grid-template-columns: 38px 1fr;
+  }
+
+  .tm-template-role-row button {
+    grid-column: 1 / -1;
   }
 
   .tm-directory-row input,

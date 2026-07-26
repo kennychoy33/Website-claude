@@ -59,6 +59,7 @@ create table if not exists public.tm_club_settings (
   logo_data_url text,
   agenda_template_name text,
   agenda_template_data_url text,
+  agenda_role_template jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (owner_id)
@@ -131,7 +132,8 @@ create index if not exists tm_club_settings_owner_idx on public.tm_club_settings
 alter table public.tm_club_settings
   add column if not exists logo_data_url text,
   add column if not exists agenda_template_name text,
-  add column if not exists agenda_template_data_url text;
+  add column if not exists agenda_template_data_url text,
+  add column if not exists agenda_role_template jsonb not null default '[]'::jsonb;
 
 create index if not exists tm_club_admins_owner_idx on public.tm_club_admins(owner_id);
 
