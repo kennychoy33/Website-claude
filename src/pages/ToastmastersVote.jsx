@@ -11,6 +11,7 @@ import {
   loadMeetingOpsState,
   loadPeopleState,
   loadLocalState,
+  loadRuntimeCloudConfig,
   loadSystemSettings,
   loadVoteState,
   markLocalVoted,
@@ -19,6 +20,7 @@ import {
   saveVoteState,
   saveMeetingOpsState,
   savePeopleState,
+  saveRuntimeCloudConfig,
   seedPeopleState,
   saveSystemSettings,
   signInWithEmail,
@@ -92,6 +94,11 @@ const LANG = {
     cloudNotReadyAdmin: '此版本没有连接 Supabase 云端数据库，不能开放投票或分享 QR。请先在 GitHub repository secrets 设置 VITE_SUPABASE_URL 和 VITE_SUPABASE_ANON_KEY，再重新部署。',
     cloudNotReadyVoter: '这个投票链接目前没有连接数据库，请联系会议维护人员重新发布云端版 QR。',
     cloudNotReadyQr: '云端未连接，QR 已停用，避免票数和后台资料不同步。',
+    cloudDbSettings: '云端资料库设定',
+    supabaseUrl: 'Supabase Project URL',
+    supabaseAnonKey: 'Supabase anon public key',
+    saveCloudConfig: '保存云端设定并刷新',
+    cloudConfigHint: '如果 GitHub secrets 还没设，可以先在这里填 Supabase URL 和 anon key。QR 会自动带上公开 anon 配置，让投票者连接同一个云端资料库。',
     unnamed: '未命名',
     submit: '提交投票',
     submitting: '提交中...',
@@ -259,6 +266,11 @@ const LANG = {
     cloudNotReadyAdmin: 'This build is not connected to the Supabase cloud database, so voting and QR sharing are disabled. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in GitHub repository secrets, then redeploy.',
     cloudNotReadyVoter: 'This voting link is not connected to the database. Please ask the meeting admin to publish the cloud QR again.',
     cloudNotReadyQr: 'Cloud is not connected. QR is disabled to prevent votes from drifting away from admin data.',
+    cloudDbSettings: 'Cloud Database Settings',
+    supabaseUrl: 'Supabase Project URL',
+    supabaseAnonKey: 'Supabase anon public key',
+    saveCloudConfig: 'Save Cloud Settings and Reload',
+    cloudConfigHint: 'If GitHub secrets are not set yet, enter the Supabase URL and anon key here. The QR will carry this public anon config so voters connect to the same cloud database.',
     unnamed: 'Unnamed',
     submit: 'Submit Vote',
     submitting: 'Submitting...',
@@ -722,8 +734,19 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
 }
 
 function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus, t }) {
+  const [cloudConfig, setCloudConfig] = useState(() => loadRuntimeCloudConfig())
+
   function update(field, value) {
     setSettings({ ...settings, [field]: value })
+  }
+
+  function updateCloudConfig(field, value) {
+    setCloudConfig({ ...cloudConfig, [field]: value })
+  }
+
+  function persistCloudConfig() {
+    saveRuntimeCloudConfig(cloudConfig)
+    window.location.reload()
   }
 
   function updateAdmin(id, field, value) {
@@ -832,6 +855,25 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
             <input value={settings.adminName} onChange={event => update('adminName', event.target.value)} />
           </label>
         </div>
+      </section>
+
+      <section className="tm-panel">
+        <div className="tm-panel-title">
+          <span className="tm-icon">☁</span>
+          <h2>{t.cloudDbSettings}</h2>
+        </div>
+        <p className="tm-panel-hint">{t.cloudConfigHint}</p>
+        <div className="tm-form-grid">
+          <label>
+            <span>{t.supabaseUrl}</span>
+            <input value={cloudConfig.url} onChange={event => updateCloudConfig('url', event.target.value.trim())} placeholder="https://xxxx.supabase.co" />
+          </label>
+          <label>
+            <span>{t.supabaseAnonKey}</span>
+            <input value={cloudConfig.anonKey} onChange={event => updateCloudConfig('anonKey', event.target.value.trim())} placeholder="eyJ..." />
+          </label>
+        </div>
+        <button className="tm-gold" onClick={persistCloudConfig}>{t.saveCloudConfig}</button>
       </section>
 
       <section className="tm-panel">

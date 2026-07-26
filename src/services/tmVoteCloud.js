@@ -3,13 +3,73 @@ import { createClient } from '@supabase/supabase-js'
 export const TM_VOTE_STORAGE_KEY = 'toastmasters-vote-demo-v5'
 export const TM_VOTE_MEETING_ID = '627'
 const TM_WORKSPACE_STORAGE_KEY = `${TM_VOTE_STORAGE_KEY}-workspace-id`
+const TM_CLOUD_CONFIG_STORAGE_KEY = `${TM_VOTE_STORAGE_KEY}-cloud-config`
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const envCloudConfig = {
+  url: import.meta.env.VITE_SUPABASE_URL || '',
+  anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+}
 
-export const isCloudConfigured = Boolean(supabaseUrl && supabaseAnonKey)
+function decodeCloudConfig(value = '') {
+  try {
+    const base64 = value.replace(/-/g, '+').replace(/_/g, '/')
+    const json = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='))
+    const parsed = JSON.parse(json)
+    return {
+      url: parsed.url || '',
+      anonKey: parsed.anonKey || '',
+    }
+  } catch {
+    return { url: '', anonKey: '' }
+  }
+}
 
-const supabase = isCloudConfigured ? createClient(supabaseUrl, supabaseAnonKey) : null
+function encodeCloudConfig(config) {
+  const json = JSON.stringify({ url: config.url || '', anonKey: config.anonKey || '' })
+  return btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function getUrlCloudConfig() {
+  const params = new URLSearchParams(window.location.search)
+  return decodeCloudConfig(params.get('cfg') || '')
+}
+
+export function loadRuntimeCloudConfig() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(TM_CLOUD_CONFIG_STORAGE_KEY) || '{}')
+    return {
+      url: saved.url || '',
+      anonKey: saved.anonKey || '',
+    }
+  } catch {
+    return { url: '', anonKey: '' }
+  }
+}
+
+export function saveRuntimeCloudConfig(config) {
+  localStorage.setItem(TM_CLOUD_CONFIG_STORAGE_KEY, JSON.stringify({
+    url: config.url || '',
+    anonKey: config.anonKey || '',
+  }))
+}
+
+export function clearRuntimeCloudConfig() {
+  localStorage.removeItem(TM_CLOUD_CONFIG_STORAGE_KEY)
+}
+
+function getActiveCloudConfig() {
+  const urlConfig = getUrlCloudConfig()
+  if (urlConfig.url && urlConfig.anonKey) return urlConfig
+  const runtimeConfig = loadRuntimeCloudConfig()
+  if (runtimeConfig.url && runtimeConfig.anonKey) return runtimeConfig
+  return envCloudConfig
+}
+
+const activeCloudConfig = getActiveCloudConfig()
+
+export const isCloudConfigured = Boolean(activeCloudConfig.url && activeCloudConfig.anonKey)
+
+const supabase = isCloudConfigured ? createClient(activeCloudConfig.url, activeCloudConfig.anonKey) : null
 
 export async function getCurrentUser() {
   if (!supabase) return null
@@ -71,6 +131,9 @@ export function getPublicVoteUrl(spaceId = '') {
   const activeSpace = spaceId || getRememberedWorkspaceId() || getLocalWorkspaceId()
   url.searchParams.set('view', 'vote')
   url.searchParams.set('space', activeSpace)
+  if (!envCloudConfig.url && !envCloudConfig.anonKey && activeCloudConfig.url && activeCloudConfig.anonKey) {
+    url.searchParams.set('cfg', encodeCloudConfig(activeCloudConfig))
+  }
   return url.toString()
 }
 

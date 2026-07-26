@@ -253,6 +253,14 @@
   margin-bottom: 0;
 }
 
+.tm-panel-hint {
+  margin: -4px 0 16px;
+  color: var(--tm-muted);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
 .tm-upload-grid {
   display: grid;
   grid-template-columns: 1fr 180px 1fr 1fr;
