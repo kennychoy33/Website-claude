@@ -4,6 +4,25 @@ export const TM_VOTE_STORAGE_KEY = 'toastmasters-vote-demo-v5'
 export const TM_VOTE_MEETING_ID = '627'
 const TM_WORKSPACE_STORAGE_KEY = `${TM_VOTE_STORAGE_KEY}-workspace-id`
 const TM_CLOUD_CONFIG_STORAGE_KEY = `${TM_VOTE_STORAGE_KEY}-cloud-config`
+const TM_ACTIVE_CLUB_STORAGE_KEY = `${TM_VOTE_STORAGE_KEY}-active-club`
+let activeClubId = localStorage.getItem(TM_ACTIVE_CLUB_STORAGE_KEY) || 'default'
+
+export function setActiveClubId(clubId = 'default') {
+  activeClubId = clubId || 'default'
+  localStorage.setItem(TM_ACTIVE_CLUB_STORAGE_KEY, activeClubId)
+}
+
+export function getActiveClubId() {
+  return activeClubId || 'default'
+}
+
+function clubKey(key) {
+  return `${key}-club-${getActiveClubId()}`
+}
+
+function getClubStorageItem(key) {
+  return localStorage.getItem(clubKey(key)) || (getActiveClubId() === 'default' ? localStorage.getItem(key) : null)
+}
 
 const envCloudConfig = {
   url: import.meta.env.VITE_SUPABASE_URL || '',
@@ -125,24 +144,27 @@ export async function signOutUser() {
   if (error) throw error
 }
 
-export function getPublicVoteUrl(spaceId = '') {
+export function getPublicVoteUrl(spaceId = '', clubId = getActiveClubId()) {
   const basePath = import.meta.env.BASE_URL || '/'
   const url = new URL(`${basePath.replace(/\/$/, '')}/tm-vote`, window.location.origin)
   const activeSpace = spaceId || getRememberedWorkspaceId() || getLocalWorkspaceId()
   url.searchParams.set('view', 'vote')
   url.searchParams.set('space', activeSpace)
+  url.searchParams.set('club', clubId || 'default')
   if (!envCloudConfig.url && !envCloudConfig.anonKey && activeCloudConfig.url && activeCloudConfig.anonKey) {
     url.searchParams.set('cfg', encodeCloudConfig(activeCloudConfig))
   }
   return url.toString()
 }
 
-function getMeetingId(spaceId = '') {
-  return spaceId ? `${spaceId}-${TM_VOTE_MEETING_ID}` : TM_VOTE_MEETING_ID
+function getMeetingId(spaceId = '', clubId = getActiveClubId()) {
+  const clubPart = clubId && clubId !== 'default' ? `-${clubId}` : ''
+  return spaceId ? `${spaceId}${clubPart}-${TM_VOTE_MEETING_ID}` : `${TM_VOTE_MEETING_ID}${clubPart}`
 }
 
 function getSpaceIdFromMeetingId(meetingId = '') {
-  const suffix = `-${TM_VOTE_MEETING_ID}`
+  const clubId = getActiveClubId()
+  const suffix = clubId && clubId !== 'default' ? `-${clubId}-${TM_VOTE_MEETING_ID}` : `-${TM_VOTE_MEETING_ID}`
   return meetingId.endsWith(suffix) ? meetingId.slice(0, -suffix.length) : ''
 }
 
@@ -255,7 +277,7 @@ export const seedSystemSettings = {
 
 export function loadLocalState() {
   try {
-    const saved = localStorage.getItem(TM_VOTE_STORAGE_KEY)
+    const saved = getClubStorageItem(TM_VOTE_STORAGE_KEY)
     const state = saved ? JSON.parse(saved) : seedState
     return {
       ...state,
@@ -270,7 +292,7 @@ export function loadLocalState() {
 }
 
 export function saveLocalState(next) {
-  localStorage.setItem(TM_VOTE_STORAGE_KEY, JSON.stringify({
+  localStorage.setItem(clubKey(TM_VOTE_STORAGE_KEY), JSON.stringify({
     ...next,
     meeting: { ...next.meeting, link: getPublicVoteUrl() },
   }))
@@ -278,7 +300,7 @@ export function saveLocalState(next) {
 
 export function loadLocalPeople() {
   try {
-    const saved = localStorage.getItem(`${TM_VOTE_STORAGE_KEY}-people`)
+    const saved = getClubStorageItem(`${TM_VOTE_STORAGE_KEY}-people`)
     return saved ? JSON.parse(saved) : seedPeopleState
   } catch {
     return seedPeopleState
@@ -286,12 +308,12 @@ export function loadLocalPeople() {
 }
 
 export function saveLocalPeople(next) {
-  localStorage.setItem(`${TM_VOTE_STORAGE_KEY}-people`, JSON.stringify(next))
+  localStorage.setItem(clubKey(`${TM_VOTE_STORAGE_KEY}-people`), JSON.stringify(next))
 }
 
 export function loadLocalMeetingOps() {
   try {
-    const saved = localStorage.getItem(`${TM_VOTE_STORAGE_KEY}-meeting-ops`)
+    const saved = getClubStorageItem(`${TM_VOTE_STORAGE_KEY}-meeting-ops`)
     return saved ? JSON.parse(saved) : seedMeetingOpsState
   } catch {
     return seedMeetingOpsState
@@ -299,12 +321,12 @@ export function loadLocalMeetingOps() {
 }
 
 export function saveLocalMeetingOps(next) {
-  localStorage.setItem(`${TM_VOTE_STORAGE_KEY}-meeting-ops`, JSON.stringify(next))
+  localStorage.setItem(clubKey(`${TM_VOTE_STORAGE_KEY}-meeting-ops`), JSON.stringify(next))
 }
 
 export function loadLocalSystemSettings() {
   try {
-    const saved = localStorage.getItem(`${TM_VOTE_STORAGE_KEY}-system-settings`)
+    const saved = getClubStorageItem(`${TM_VOTE_STORAGE_KEY}-system-settings`)
     return saved ? { ...seedSystemSettings, ...JSON.parse(saved) } : seedSystemSettings
   } catch {
     return seedSystemSettings
@@ -312,7 +334,7 @@ export function loadLocalSystemSettings() {
 }
 
 export function saveLocalSystemSettings(next) {
-  localStorage.setItem(`${TM_VOTE_STORAGE_KEY}-system-settings`, JSON.stringify(next))
+  localStorage.setItem(clubKey(`${TM_VOTE_STORAGE_KEY}-system-settings`), JSON.stringify(next))
 }
 
 export async function loadSystemSettings(spaceId = '') {
@@ -585,7 +607,7 @@ export async function saveMeetingOpsState(state) {
   return { source: 'cloud' }
 }
 
-export async function loadVoteState(spaceId = '') {
+export async function loadVoteState(spaceId = '', clubId = getActiveClubId()) {
   if (!isCloudConfigured) {
     return { data: loadLocalState(), source: 'local' }
   }
@@ -595,7 +617,7 @@ export async function loadVoteState(spaceId = '') {
   if (!activeSpace) {
     return { data: loadLocalState(), source: 'local' }
   }
-  const meetingId = getMeetingId(activeSpace)
+  const meetingId = getMeetingId(activeSpace, clubId)
 
   const { data: meeting, error: meetingError } = await supabase
     .from('tm_meetings')
@@ -653,7 +675,7 @@ export async function saveVoteState(state) {
 
   rememberWorkspaceId(user.id)
   const meetingId = getMeetingId(user.id)
-  const meeting = { ...state.meeting, id: meetingId, link: getPublicVoteUrl(user.id) }
+  const meeting = { ...state.meeting, id: meetingId, link: getPublicVoteUrl(user.id, getActiveClubId()) }
   const meetingRow = toMeetingRow(meeting, meetingId, user.id)
   const candidateRows = [
     ...state.prepared.map((item, index) => toCandidateRow(item, meetingId, 'prepared', index)),

@@ -6,6 +6,7 @@ import {
   getLocalWorkspaceId,
   getPublicVoteUrl,
   getRememberedWorkspaceId,
+  getActiveClubId,
   hasLocalVote,
   isCloudConfigured,
   loadMeetingOpsState,
@@ -21,6 +22,7 @@ import {
   saveMeetingOpsState,
   savePeopleState,
   saveRuntimeCloudConfig,
+  setActiveClubId,
   seedPeopleState,
   saveSystemSettings,
   signInWithEmail,
@@ -38,6 +40,14 @@ function getVoteInstanceKey(data, spaceId = '') {
     meeting.number,
     meeting.date,
   ].filter(Boolean).join('|') || 'default'
+}
+
+function loadManagedClubs() {
+  try {
+    return JSON.parse(localStorage.getItem('tm-master-clubs') || '[]')
+  } catch {
+    return []
+  }
 }
 
 const LANG = {
@@ -99,6 +109,9 @@ const LANG = {
     supabaseAnonKey: 'Supabase anon public key',
     saveCloudConfig: '保存云端设定并刷新',
     cloudConfigHint: '如果 GitHub secrets 还没设，可以先在这里填 Supabase URL 和 anon key。QR 会自动带上公开 anon 配置，让投票者连接同一个云端资料库。',
+    currentClub: '当前分会',
+    defaultClub: '默认分会',
+    switchClubHint: '切换分会后，会员、例会、投票、QR 和例会表会使用该分会自己的资料。',
     unnamed: '未命名',
     submit: '提交投票',
     submitting: '提交中...',
@@ -271,6 +284,9 @@ const LANG = {
     supabaseAnonKey: 'Supabase anon public key',
     saveCloudConfig: 'Save Cloud Settings and Reload',
     cloudConfigHint: 'If GitHub secrets are not set yet, enter the Supabase URL and anon key here. The QR will carry this public anon config so voters connect to the same cloud database.',
+    currentClub: 'Current Club',
+    defaultClub: 'Default Club',
+    switchClubHint: 'After switching clubs, members, meetings, votes, QR links, and agendas use that club’s own data.',
     unnamed: 'Unnamed',
     submit: 'Submit Vote',
     submitting: 'Submitting...',
@@ -955,7 +971,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
   )
 }
 
-function MasterAdminView({ settings, t }) {
+function MasterAdminView({ settings, t, onClubsChange }) {
   const admins = settings.clubAdmins || []
   const [clubs, setClubs] = useState(() => {
     try {
@@ -988,18 +1004,22 @@ function MasterAdminView({ settings, t }) {
       { ...draft, id: `club${Date.now()}` },
     ]
     setClubs(nextClubs)
+    onClubsChange?.(nextClubs)
     localStorage.setItem('tm-master-clubs', JSON.stringify(nextClubs))
     setDraft({ clubName: '', toastmasterId: '', username: '', password: '', adminName: '' })
     setMessage(t.clubCreated)
   }
 
   function updateClub(id, field, value) {
-    setClubs(clubs.map(club => club.id === id ? { ...club, [field]: value } : club))
+    const nextClubs = clubs.map(club => club.id === id ? { ...club, [field]: value } : club)
+    setClubs(nextClubs)
+    onClubsChange?.(nextClubs)
   }
 
   function deleteClub(id) {
     const nextClubs = clubs.filter(club => club.id !== id)
     setClubs(nextClubs)
+    onClubsChange?.(nextClubs)
     localStorage.setItem('tm-master-clubs', JSON.stringify(nextClubs))
   }
 
@@ -1012,6 +1032,7 @@ function MasterAdminView({ settings, t }) {
       }
       nextClubs = [...clubs, { ...draft, id: `club${Date.now()}` }]
       setClubs(nextClubs)
+      onClubsChange?.(nextClubs)
       setDraft({ clubName: '', toastmasterId: '', username: '', password: '', adminName: '' })
     }
     localStorage.setItem('tm-master-clubs', JSON.stringify(nextClubs))
@@ -1557,7 +1578,7 @@ function candidatesFromMeetingRoles(roles, people, existingData) {
 }
 
 function meetingRecordKey() {
-  return 'tm-meeting-records-v1'
+  return `tm-meeting-records-v1-${getActiveClubId()}`
 }
 
 function isRecordLocked(record) {
@@ -1942,6 +1963,21 @@ function LoginView({ lang, setLang, t, onLogin }) {
   )
 }
 
+function ClubSwitcher({ clubs, selectedClubId, onChange, t }) {
+  return (
+    <div className="tm-club-switcher">
+      <span>{t.currentClub}</span>
+      <select value={selectedClubId} onChange={event => onChange(event.target.value)}>
+        <option value="default">{t.defaultClub}</option>
+        {clubs.map(club => (
+          <option key={club.id} value={club.id}>{club.clubName || club.toastmasterId || club.id}</option>
+        ))}
+      </select>
+      <small>{t.switchClubHint}</small>
+    </div>
+  )
+}
+
 export default function ToastmastersVote() {
   const [data, setData] = useState(null)
   const [people, setPeople] = useState({ members: [], guests: [] })
@@ -1959,8 +1995,11 @@ export default function ToastmastersVote() {
   })
   const publicView = new URLSearchParams(window.location.search).get('view') === 'vote'
   const publicSpace = new URLSearchParams(window.location.search).get('space') || ''
+  const publicClub = new URLSearchParams(window.location.search).get('club') || 'default'
   const [view, setView] = useState(publicView ? 'vote' : 'system')
   const [lang, setLang] = useState(() => localStorage.getItem('tm-vote-lang') || 'zh')
+  const [managedClubs, setManagedClubs] = useState(() => loadManagedClubs())
+  const [selectedClubId, setSelectedClubId] = useState(() => publicView ? publicClub : getActiveClubId())
   const [user, setUser] = useState(null)
   const [authReady, setAuthReady] = useState(!isCloudConfigured || publicView)
   const [source, setSource] = useState(isCloudConfigured ? 'cloud' : 'local')
@@ -1974,7 +2013,11 @@ export default function ToastmastersVote() {
   const workspaceId = user?.id || publicSpace || (isCloudConfigured ? getRememberedWorkspaceId() : getLocalWorkspaceId())
   const effectiveVoteLink = publicView
     ? window.location.href
-    : getPublicVoteUrl(workspaceId)
+    : getPublicVoteUrl(workspaceId, selectedClubId)
+
+  useEffect(() => {
+    setActiveClubId(selectedClubId)
+  }, [selectedClubId])
 
   useEffect(() => {
     if (user?.id) rememberWorkspaceId(user.id)
@@ -2004,7 +2047,8 @@ export default function ToastmastersVote() {
       if (!authReady || (!publicView && isCloudConfigured && !user)) return
       setSyncStatus(t.syncing)
       try {
-        const result = await loadVoteState(publicView ? publicSpace : '')
+        setActiveClubId(publicView ? publicClub : selectedClubId)
+        const result = await loadVoteState(publicView ? publicSpace : '', publicView ? publicClub : selectedClubId)
         if (!ignore) {
           setData(normalizeState(result.data))
           setSource(result.source)
@@ -2020,13 +2064,14 @@ export default function ToastmastersVote() {
     }
     hydrate()
     return () => { ignore = true }
-  }, [authReady, user, publicView, publicSpace])
+  }, [authReady, user, publicView, publicSpace, publicClub, selectedClubId])
 
   useEffect(() => {
     let ignore = false
     async function hydratePeople() {
       if (publicView || !authReady || (isCloudConfigured && !user)) return
       try {
+        setActiveClubId(selectedClubId)
         const result = await loadPeopleState()
         if (!ignore) setPeople(result.data)
       } catch {
@@ -2035,13 +2080,14 @@ export default function ToastmastersVote() {
     }
     hydratePeople()
     return () => { ignore = true }
-  }, [authReady, user, publicView])
+  }, [authReady, user, publicView, selectedClubId])
 
   useEffect(() => {
     let ignore = false
     async function hydrateSettings() {
       if (!authReady || (!publicView && isCloudConfigured && !user)) return
       try {
+        setActiveClubId(publicView ? publicClub : selectedClubId)
         const result = await loadSystemSettings(publicView ? publicSpace : '')
         if (!ignore) setSettings(result.data)
       } catch {
@@ -2050,13 +2096,14 @@ export default function ToastmastersVote() {
     }
     hydrateSettings()
     return () => { ignore = true }
-  }, [authReady, user, publicView, publicSpace])
+  }, [authReady, user, publicView, publicSpace, publicClub, selectedClubId])
 
   useEffect(() => {
     let ignore = false
     async function hydrateMeetingOps() {
       if (publicView || !authReady || (isCloudConfigured && !user) || !data?.meeting?.id) return
       try {
+        setActiveClubId(selectedClubId)
         const result = await loadMeetingOpsState(data.meeting.id)
         if (!ignore) setMeetingOps(result.data)
       } catch {
@@ -2065,7 +2112,17 @@ export default function ToastmastersVote() {
     }
     hydrateMeetingOps()
     return () => { ignore = true }
-  }, [authReady, user, publicView, data?.meeting?.id])
+  }, [authReady, user, publicView, data?.meeting?.id, selectedClubId])
+
+  function switchClub(clubId) {
+    setSelectedClubId(clubId)
+    setActiveClubId(clubId)
+    setData(null)
+    setPeople({ members: [], guests: [] })
+    setMeetingOps({ attendance: [], roles: [] })
+    setSettings({ clubName: '', clubShort: '', toastmasterId: '', adminName: '', username: '', logoDataUrl: '', agendaTemplateName: '', agendaTemplateDataUrl: '', clubAdmins: [] })
+    setView('system')
+  }
 
   function changeLang(nextLang) {
     setLang(nextLang)
@@ -2187,6 +2244,7 @@ export default function ToastmastersVote() {
       {!publicView && <aside className="tm-sidebar">
         <div className="tm-brand">{appText.clubShort}</div>
         <LanguageToggle lang={lang} setLang={changeLang} t={appText} />
+        <ClubSwitcher clubs={managedClubs} selectedClubId={selectedClubId} onChange={switchClub} t={appText} />
         {isCloudConfigured && <button onClick={handleLogout}>{appText.logout}</button>}
         {nav.map(([key, label]) => (
           <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
@@ -2199,7 +2257,7 @@ export default function ToastmastersVote() {
       </aside>}
       <main className="tm-content">
         {view === 'system' && <SystemSettingsView settings={settings} setSettings={setSettings} persistSettings={persistSettings} syncStatus={syncStatus} t={appText} />}
-        {view === 'master' && <MasterAdminView settings={settings} t={appText} />}
+        {view === 'master' && <MasterAdminView settings={settings} t={appText} onClubsChange={setManagedClubs} />}
         {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} meetingOps={meetingOps} spaceId={workspaceId} voteLink={effectiveVoteLink} />}
         {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={appText} />}
         {view === 'meeting' && <MeetingView data={data} setData={setData} persistState={persistState} people={people} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={appText} settings={settings} />}

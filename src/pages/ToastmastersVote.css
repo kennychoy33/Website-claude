@@ -87,6 +87,34 @@
   color: white;
 }
 
+.tm-club-switcher {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  margin: -6px 0 12px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 8px;
+  background: rgba(255,255,255,.07);
+}
+
+.tm-club-switcher span,
+.tm-club-switcher small {
+  color: rgba(255,255,255,.78);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.tm-club-switcher select {
+  width: 100%;
+  border: 0;
+  border-radius: 7px;
+  padding: 9px 10px;
+  color: var(--tm-navy);
+  font: inherit;
+  font-weight: 900;
+}
+
 .tm-sidebar-bottom {
   margin-top: auto;
   padding-top: 18px;
