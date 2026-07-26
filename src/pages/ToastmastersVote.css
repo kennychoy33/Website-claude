@@ -193,7 +193,8 @@
 .tm-share-panel button,
 .tm-panel button,
 .tm-submit-vote,
-.tm-success-card button {
+.tm-success-card button,
+.tm-card-action {
   border: 1px solid #b8c7d9;
   background: white;
   color: var(--tm-navy);
@@ -202,6 +203,10 @@
   font-weight: 900;
   font-size: 14px;
   cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .tm-actions button:disabled,
@@ -217,7 +222,8 @@
 .tm-actions .tm-gold,
 .tm-share-panel button:first-of-type,
 .tm-submit-vote,
-.tm-success-card button {
+.tm-success-card button,
+.tm-card-action {
   background: var(--tm-navy);
   color: white;
   border-color: var(--tm-navy);

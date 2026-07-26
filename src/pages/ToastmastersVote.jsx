@@ -50,6 +50,11 @@ function loadManagedClubs() {
   }
 }
 
+function getSettingsUrl() {
+  const basePath = import.meta.env.BASE_URL || '/'
+  return new URL(`${basePath.replace(/\/$/, '')}/tm-vote`, window.location.origin).toString()
+}
+
 const LANG = {
   zh: {
     navAdmin: '投票设置',
@@ -101,9 +106,10 @@ const LANG = {
     waitOpen: '请等待会议维护人员开放投票。',
     missingSpace: '投票链接缺少分会空间，请重新扫描管理员分享的 QR。',
     cloudNotReadyTitle: '云端未连接',
-    cloudNotReadyAdmin: '此版本没有连接 Supabase 云端数据库，不能开放投票或分享 QR。请先在 GitHub repository secrets 设置 VITE_SUPABASE_URL 和 VITE_SUPABASE_ANON_KEY，再重新部署。',
-    cloudNotReadyVoter: '这个投票链接目前没有连接数据库，请联系会议维护人员重新发布云端版 QR。',
+    cloudNotReadyAdmin: '此版本没有连接 Supabase 云端数据库，不能开放投票或分享 QR。请到分会资料设定里的云端资料库设定，填入 Supabase Project URL 和 anon public key，然后保存刷新。',
+    cloudNotReadyVoter: '这个投票链接目前没有连接数据库。会议维护人员请打开分会资料设定，填入 Supabase Project URL 和 anon public key 后重新发布 QR。',
     cloudNotReadyQr: '云端未连接，QR 已停用，避免票数和后台资料不同步。',
+    openSettings: '打开分会资料设定',
     cloudDbSettings: '云端资料库设定',
     supabaseUrl: 'Supabase Project URL',
     supabaseAnonKey: 'Supabase anon public key',
@@ -276,9 +282,10 @@ const LANG = {
     waitOpen: 'Please wait for the meeting admin to open voting.',
     missingSpace: 'Voting link is missing the club workspace. Please scan the admin QR again.',
     cloudNotReadyTitle: 'Cloud is not connected',
-    cloudNotReadyAdmin: 'This build is not connected to the Supabase cloud database, so voting and QR sharing are disabled. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in GitHub repository secrets, then redeploy.',
-    cloudNotReadyVoter: 'This voting link is not connected to the database. Please ask the meeting admin to publish the cloud QR again.',
+    cloudNotReadyAdmin: 'This build is not connected to the Supabase cloud database, so voting and QR sharing are disabled. Open Club Settings, enter the Supabase Project URL and anon public key, then save and reload.',
+    cloudNotReadyVoter: 'This voting link is not connected to the database. Meeting admins should open Club Settings, enter the Supabase Project URL and anon public key, then publish the QR again.',
     cloudNotReadyQr: 'Cloud is not connected. QR is disabled to prevent votes from drifting away from admin data.',
+    openSettings: 'Open Club Settings',
     cloudDbSettings: 'Cloud Database Settings',
     supabaseUrl: 'Supabase Project URL',
     supabaseAnonKey: 'Supabase anon public key',
@@ -697,6 +704,7 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
           <section className="tm-panel tm-note-panel">
             <h2>{t.cloudNotReadyTitle}</h2>
             <p>{t.cloudNotReadyAdmin}</p>
+            <a className="tm-card-action" href={getSettingsUrl()}>{t.openSettings}</a>
           </section>
         )}
 
@@ -1216,6 +1224,7 @@ function SharePoster({ data, t, voteLink }) {
       <div className="tm-success-card">
         <h2>{t.cloudNotReadyTitle}</h2>
         <p>{t.cloudNotReadyAdmin}</p>
+        <a className="tm-card-action" href={getSettingsUrl()}>{t.openSettings}</a>
       </div>
     )
   }
@@ -2233,6 +2242,7 @@ export default function ToastmastersVote() {
           <div className="tm-success-card">
             <h2>{appText.cloudNotReadyTitle}</h2>
             <p>{appText.cloudNotReadyVoter}</p>
+            <a className="tm-card-action" href={getSettingsUrl()}>{appText.openSettings}</a>
           </div>
         </main>
       </div>
