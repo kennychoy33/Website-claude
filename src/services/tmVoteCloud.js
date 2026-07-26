@@ -232,11 +232,21 @@ export async function loadSystemSettings(spaceId = '') {
 
   const ownerId = spaceId || user.id
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('tm_club_settings')
     .select('owner_id, club_name, club_short, toastmaster_id, admin_name, username, logo_data_url, agenda_template_name, agenda_template_data_url, agenda_role_template')
     .eq('owner_id', ownerId)
     .maybeSingle()
+
+  if (error) {
+    const result = await supabase
+      .from('tm_club_settings')
+      .select('owner_id, club_name, club_short, toastmaster_id, admin_name, username')
+      .eq('owner_id', ownerId)
+      .maybeSingle()
+    data = result.data
+    error = result.error
+  }
 
   if (error) throw error
   if (!data) return { data: seedSystemSettings, source: 'cloud' }
@@ -249,8 +259,9 @@ export async function loadSystemSettings(spaceId = '') {
       .eq('owner_id', user.id)
       .order('created_at', { ascending: true })
 
-    if (adminsError) throw adminsError
-    clubAdmins = admins.length ? admins.map(fromClubAdminRow) : seedSystemSettings.clubAdmins
+    if (!adminsError) {
+      clubAdmins = admins.length ? admins.map(fromClubAdminRow) : seedSystemSettings.clubAdmins
+    }
   }
 
   return { data: { ...fromSystemSettingsRow(data), clubAdmins }, source: 'cloud' }
@@ -272,14 +283,30 @@ export async function saveSystemSettings(settings) {
     .from('tm_club_settings')
     .upsert(toSystemSettingsRow(settings, user.id), { onConflict: 'owner_id' })
 
-  if (error) throw error
+  if (error) {
+    const { error: minimalError } = await supabase
+      .from('tm_club_settings')
+      .upsert({
+        owner_id: user.id,
+        club_name: settings.clubName,
+        club_short: settings.clubShort,
+        toastmaster_id: settings.toastmasterId,
+        admin_name: settings.adminName,
+        username: settings.username,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'owner_id' })
+
+    if (minimalError) throw minimalError
+    saveLocalSystemSettings(settings)
+    return { source: 'cloud' }
+  }
 
   const { error: deleteAdminsError } = await supabase
     .from('tm_club_admins')
     .delete()
     .eq('owner_id', user.id)
 
-  if (deleteAdminsError) throw deleteAdminsError
+  if (deleteAdminsError) return { source: 'cloud' }
 
   const adminRows = (settings.clubAdmins || []).map(item => toClubAdminRow(item, user.id))
   if (adminRows.length) {
@@ -287,7 +314,7 @@ export async function saveSystemSettings(settings) {
       .from('tm_club_admins')
       .insert(adminRows)
 
-    if (insertAdminsError) throw insertAdminsError
+    if (insertAdminsError) return { source: 'cloud' }
   }
 
   return { source: 'cloud' }

@@ -3,6 +3,7 @@ import QRCode from 'qrcode'
 import {
   getOrCreateVoterToken,
   getCurrentUser,
+  getPublicVoteUrl,
   hasLocalVote,
   isCloudConfigured,
   loadMeetingOpsState,
@@ -556,7 +557,7 @@ function CandidateEditor({ type, candidates, onChange, t, people, meetingRoles =
   )
 }
 
-function AdminView({ data, setData, setView, persistState, source, syncStatus, t, people, meetingOps }) {
+function AdminView({ data, setData, setView, persistState, source, syncStatus, t, people, meetingOps, spaceId }) {
   function updateMeeting(field, value) {
     setData({ ...data, meeting: { ...data.meeting, [field]: value } })
   }
@@ -566,7 +567,14 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
   }
 
   function syncedVoteData(nextData = data) {
-    return candidatesFromMeetingRoles(meetingOps.roles, people, nextData)
+    const synced = candidatesFromMeetingRoles(meetingOps.roles, people, nextData)
+    return {
+      ...synced,
+      meeting: {
+        ...synced.meeting,
+        link: getPublicVoteUrl(spaceId),
+      },
+    }
   }
 
   function saveSetup() {
@@ -802,7 +810,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
           </div>
           <label className="tm-upload-box">
             <span>{t.agendaTemplate}</span>
-            <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" onChange={event => readFile(event, 'agendaTemplateDataUrl', 'agendaTemplateName')} />
+            <input type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={event => readFile(event, 'agendaTemplateDataUrl', 'agendaTemplateName')} />
           </label>
           <div className="tm-template-preview">
             <b>{settings.agendaTemplateName || t.pending}</b>
@@ -1743,6 +1751,17 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
       </section>
 
       <section className="tm-agenda-print">
+        {settings.agendaTemplateDataUrl && (
+          <div className="tm-template-print">
+            {settings.agendaTemplateDataUrl.startsWith('data:image') ? (
+              <img src={settings.agendaTemplateDataUrl} alt={settings.agendaTemplateName || t.agendaTemplate} />
+            ) : settings.agendaTemplateDataUrl.startsWith('data:application/pdf') ? (
+              <embed src={settings.agendaTemplateDataUrl} type="application/pdf" />
+            ) : (
+              <p>{t.agendaTemplate}: {settings.agendaTemplateName}</p>
+            )}
+          </div>
+        )}
         <header>
           {settings.logoDataUrl && <img className="tm-agenda-logo" src={settings.logoDataUrl} alt={t.clubShort} />}
           <h1>{t.club}</h1>
@@ -2056,7 +2075,7 @@ export default function ToastmastersVote() {
       <main className="tm-content">
         {view === 'system' && <SystemSettingsView settings={settings} setSettings={setSettings} persistSettings={persistSettings} syncStatus={syncStatus} t={appText} />}
         {view === 'master' && <MasterAdminView settings={settings} t={appText} />}
-        {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} meetingOps={meetingOps} />}
+        {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} meetingOps={meetingOps} spaceId={user?.id || ''} />}
         {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={appText} />}
         {view === 'meeting' && <MeetingView data={data} setData={setData} persistState={persistState} people={people} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={appText} settings={settings} />}
         {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={appText} />}
