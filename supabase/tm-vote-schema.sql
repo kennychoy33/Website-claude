@@ -48,6 +48,59 @@ create table if not exists public.tm_winner_history (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.tm_members (
+  id text primary key,
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  english_name text,
+  email text,
+  phone text,
+  pathway text,
+  level text,
+  status text not null default 'active' check (status in ('active', 'inactive')),
+  joined_date text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.tm_guests (
+  id text primary key,
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  email text,
+  phone text,
+  introduced_by text,
+  visit_date text,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.tm_meeting_attendance (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  meeting_id text not null references public.tm_meetings(id) on delete cascade,
+  person_type text not null check (person_type in ('member', 'guest')),
+  person_id text not null,
+  attended boolean not null default true,
+  created_at timestamptz not null default now(),
+  unique (meeting_id, person_type, person_id)
+);
+
+create table if not exists public.tm_meeting_roles (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  meeting_id text not null references public.tm_meetings(id) on delete cascade,
+  role_name text not null,
+  person_type text not null check (person_type in ('member', 'guest')),
+  person_id text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists tm_members_owner_idx on public.tm_members(owner_id);
+create index if not exists tm_guests_owner_idx on public.tm_guests(owner_id);
+create index if not exists tm_attendance_owner_meeting_idx on public.tm_meeting_attendance(owner_id, meeting_id);
+create index if not exists tm_roles_owner_meeting_idx on public.tm_meeting_roles(owner_id, meeting_id);
+
 alter table public.tm_meetings
   add column if not exists owner_id uuid references auth.users(id) on delete cascade;
 
@@ -115,6 +168,10 @@ alter table public.tm_meetings enable row level security;
 alter table public.tm_candidates enable row level security;
 alter table public.tm_votes enable row level security;
 alter table public.tm_winner_history enable row level security;
+alter table public.tm_members enable row level security;
+alter table public.tm_guests enable row level security;
+alter table public.tm_meeting_attendance enable row level security;
+alter table public.tm_meeting_roles enable row level security;
 
 drop policy if exists "tm meetings public read" on public.tm_meetings;
 drop policy if exists "tm meetings public write" on public.tm_meetings;
@@ -126,6 +183,10 @@ drop policy if exists "tm candidates public delete" on public.tm_candidates;
 drop policy if exists "tm votes public insert" on public.tm_votes;
 drop policy if exists "tm history public read" on public.tm_winner_history;
 drop policy if exists "tm history public write" on public.tm_winner_history;
+drop policy if exists "tm members owner all" on public.tm_members;
+drop policy if exists "tm guests owner all" on public.tm_guests;
+drop policy if exists "tm attendance owner all" on public.tm_meeting_attendance;
+drop policy if exists "tm roles owner all" on public.tm_meeting_roles;
 
 create policy "tm meetings public read"
 on public.tm_meetings for select
@@ -202,3 +263,27 @@ create policy "tm history public write"
 on public.tm_winner_history for insert
 to anon
 with check (true);
+
+create policy "tm members owner all"
+on public.tm_members for all
+to authenticated
+using (owner_id = (select auth.uid()))
+with check (owner_id = (select auth.uid()));
+
+create policy "tm guests owner all"
+on public.tm_guests for all
+to authenticated
+using (owner_id = (select auth.uid()))
+with check (owner_id = (select auth.uid()));
+
+create policy "tm attendance owner all"
+on public.tm_meeting_attendance for all
+to authenticated
+using (owner_id = (select auth.uid()))
+with check (owner_id = (select auth.uid()));
+
+create policy "tm roles owner all"
+on public.tm_meeting_roles for all
+to authenticated
+using (owner_id = (select auth.uid()))
+with check (owner_id = (select auth.uid()));

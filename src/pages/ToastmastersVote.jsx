@@ -5,11 +5,13 @@ import {
   getCurrentUser,
   hasLocalVote,
   isCloudConfigured,
+  loadPeopleState,
   loadLocalState,
   loadVoteState,
   markLocalVoted,
   onAuthChange,
   saveVoteState,
+  savePeopleState,
   signInWithEmail,
   signOutUser,
   signUpWithEmail,
@@ -20,6 +22,7 @@ import './ToastmastersVote.css'
 const LANG = {
   zh: {
     navAdmin: '投票设置',
+    navPeople: '会员嘉宾',
     navVote: '投票页面',
     navShare: '分享海报',
     navResults: '结果统计',
@@ -101,9 +104,27 @@ const LANG = {
     logout: '登出',
     loginTitle: 'Toastmasters 投票系统',
     loginSubtitle: '登录你的独立空间，管理自己的会议、候选人和历史票数。',
+    membersTitle: '会员资料库',
+    guestsTitle: '嘉宾资料库',
+    addMember: '+ 添加会员',
+    addGuest: '+ 添加嘉宾',
+    englishName: '英文名',
+    phone: '电话',
+    pathway: 'Pathway',
+    level: 'Level',
+    status: '状态',
+    joinedDate: '加入日期',
+    introducedBy: '介绍人',
+    visitDate: '来访日期',
+    notes: '备注',
+    active: 'Active',
+    inactive: 'Inactive',
+    importMembers: '从会员资料带入',
+    peopleSaved: '会员/嘉宾已保存',
   },
   en: {
     navAdmin: 'Setup',
+    navPeople: 'Members & Guests',
     navVote: 'Voting Page',
     navShare: 'Share Poster',
     navResults: 'Results',
@@ -185,6 +206,23 @@ const LANG = {
     logout: 'Logout',
     loginTitle: 'Toastmasters Voting System',
     loginSubtitle: 'Sign in to manage your own meetings, candidates, and voting history.',
+    membersTitle: 'Member Directory',
+    guestsTitle: 'Guest Directory',
+    addMember: '+ Add Member',
+    addGuest: '+ Add Guest',
+    englishName: 'English Name',
+    phone: 'Phone',
+    pathway: 'Pathway',
+    level: 'Level',
+    status: 'Status',
+    joinedDate: 'Joined Date',
+    introducedBy: 'Introduced By',
+    visitDate: 'Visit Date',
+    notes: 'Notes',
+    active: 'Active',
+    inactive: 'Inactive',
+    importMembers: 'Import from Members',
+    peopleSaved: 'Members / guests saved',
   },
 }
 
@@ -304,7 +342,7 @@ function CandidateEditor({ type, candidates, onChange, t }) {
   )
 }
 
-function AdminView({ data, setData, setView, persistState, source, syncStatus, t }) {
+function AdminView({ data, setData, setView, persistState, source, syncStatus, t, people }) {
   function updateMeeting(field, value) {
     setData({ ...data, meeting: { ...data.meeting, [field]: value } })
   }
@@ -317,6 +355,29 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
     const next = { ...data, meeting: { ...data.meeting, status } }
     setData(next)
     persistState(next)
+  }
+
+  function importFromMembers() {
+    const activeMembers = (people?.members || []).filter(member => member.status !== 'inactive')
+    const toBasicCandidate = (member, prefix, index) => ({
+      id: `${prefix}${Date.now()}${index}`,
+      name: member.name,
+      title: '',
+      project: [member.pathway, member.level].filter(Boolean).join(' '),
+      votes: 0,
+    })
+    const toNameCandidate = (member, prefix, index) => ({
+      id: `${prefix}${Date.now()}${index}`,
+      name: member.name,
+      votes: 0,
+    })
+    const next = {
+      ...data,
+      prepared: activeMembers.slice(0, 2).map((member, index) => toBasicCandidate(member, 'p', index)),
+      impromptu: activeMembers.slice(0, 4).map((member, index) => toNameCandidate(member, 'i', index)),
+      evaluator: activeMembers.slice(0, 2).map((member, index) => toNameCandidate(member, 'e', index)),
+    }
+    setData(next)
   }
 
   const savedVotes =
@@ -335,6 +396,7 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
           </div>
           <div className="tm-actions">
             <button onClick={() => persistState(data)}>{t.save}</button>
+            <button onClick={importFromMembers}>{t.importMembers}</button>
             <button className="tm-gold" onClick={() => setStatus('open')}>{t.openVote}</button>
             <button onClick={() => setView('vote')}>{t.preview}</button>
           </div>
@@ -572,6 +634,148 @@ function HistoryView({ data, t }) {
   )
 }
 
+function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
+  function updateMember(id, field, value) {
+    setPeople({
+      ...people,
+      members: people.members.map(item => item.id === id ? { ...item, [field]: value } : item),
+    })
+  }
+
+  function updateGuest(id, field, value) {
+    setPeople({
+      ...people,
+      guests: people.guests.map(item => item.id === id ? { ...item, [field]: value } : item),
+    })
+  }
+
+  function addMember() {
+    setPeople({
+      ...people,
+      members: [
+        ...people.members,
+        {
+          id: `m${Date.now()}`,
+          name: '',
+          englishName: '',
+          email: '',
+          phone: '',
+          pathway: '',
+          level: '',
+          status: 'active',
+          joinedDate: '',
+        },
+      ],
+    })
+  }
+
+  function addGuest() {
+    setPeople({
+      ...people,
+      guests: [
+        ...people.guests,
+        {
+          id: `g${Date.now()}`,
+          name: '',
+          email: '',
+          phone: '',
+          introducedBy: '',
+          visitDate: '',
+          notes: '',
+        },
+      ],
+    })
+  }
+
+  function removeMember(id) {
+    setPeople({ ...people, members: people.members.filter(item => item.id !== id) })
+  }
+
+  function removeGuest(id) {
+    setPeople({ ...people, guests: people.guests.filter(item => item.id !== id) })
+  }
+
+  return (
+    <div className="tm-main-column">
+      <div className="tm-screen-head">
+        <div>
+          <h1>{t.navPeople}</h1>
+          <p>{t.privateSpace}</p>
+          {syncStatus && <div className="tm-sync-badge"><b>{syncStatus}</b></div>}
+        </div>
+        <div className="tm-actions">
+          <button className="tm-gold" onClick={() => persistPeople(people)}>{t.save}</button>
+          <button onClick={addMember}>{t.addMember}</button>
+          <button onClick={addGuest}>{t.addGuest}</button>
+        </div>
+      </div>
+
+      <section className="tm-panel">
+        <div className="tm-panel-title">
+          <span className="tm-icon">👥</span>
+          <h2>{t.membersTitle}</h2>
+        </div>
+        <div className="tm-directory-table members">
+          <div className="tm-directory-head">
+            <span>{t.name}</span>
+            <span>{t.englishName}</span>
+            <span>{t.pathway}</span>
+            <span>{t.level}</span>
+            <span>{t.email}</span>
+            <span>{t.phone}</span>
+            <span>{t.status}</span>
+            <span>{t.action}</span>
+          </div>
+          {people.members.map(item => (
+            <div className="tm-directory-row" key={item.id}>
+              <input value={item.name} onChange={e => updateMember(item.id, 'name', e.target.value)} />
+              <input value={item.englishName} onChange={e => updateMember(item.id, 'englishName', e.target.value)} />
+              <input value={item.pathway} onChange={e => updateMember(item.id, 'pathway', e.target.value)} />
+              <input value={item.level} onChange={e => updateMember(item.id, 'level', e.target.value)} />
+              <input value={item.email} onChange={e => updateMember(item.id, 'email', e.target.value)} />
+              <input value={item.phone} onChange={e => updateMember(item.id, 'phone', e.target.value)} />
+              <select value={item.status} onChange={e => updateMember(item.id, 'status', e.target.value)}>
+                <option value="active">{t.active}</option>
+                <option value="inactive">{t.inactive}</option>
+              </select>
+              <button className="tm-danger" onClick={() => removeMember(item.id)}>{t.remove}</button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="tm-panel">
+        <div className="tm-panel-title">
+          <span className="tm-icon">🙋</span>
+          <h2>{t.guestsTitle}</h2>
+        </div>
+        <div className="tm-directory-table guests">
+          <div className="tm-directory-head">
+            <span>{t.name}</span>
+            <span>{t.email}</span>
+            <span>{t.phone}</span>
+            <span>{t.introducedBy}</span>
+            <span>{t.visitDate}</span>
+            <span>{t.notes}</span>
+            <span>{t.action}</span>
+          </div>
+          {people.guests.map(item => (
+            <div className="tm-directory-row" key={item.id}>
+              <input value={item.name} onChange={e => updateGuest(item.id, 'name', e.target.value)} />
+              <input value={item.email} onChange={e => updateGuest(item.id, 'email', e.target.value)} />
+              <input value={item.phone} onChange={e => updateGuest(item.id, 'phone', e.target.value)} />
+              <input value={item.introducedBy} onChange={e => updateGuest(item.id, 'introducedBy', e.target.value)} />
+              <input value={item.visitDate} onChange={e => updateGuest(item.id, 'visitDate', e.target.value)} />
+              <input value={item.notes} onChange={e => updateGuest(item.id, 'notes', e.target.value)} />
+              <button className="tm-danger" onClick={() => removeGuest(item.id)}>{t.remove}</button>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
 function normalizeState(next) {
   return {
     ...next,
@@ -636,6 +840,7 @@ function LoginView({ lang, setLang, t, onLogin }) {
 
 export default function ToastmastersVote() {
   const [data, setData] = useState(null)
+  const [people, setPeople] = useState({ members: [], guests: [] })
   const publicView = new URLSearchParams(window.location.search).get('view') === 'vote'
   const publicSpace = new URLSearchParams(window.location.search).get('space') || ''
   const [view, setView] = useState(publicView ? 'vote' : 'admin')
@@ -688,6 +893,21 @@ export default function ToastmastersVote() {
     return () => { ignore = true }
   }, [authReady, user, publicView, publicSpace])
 
+  useEffect(() => {
+    let ignore = false
+    async function hydratePeople() {
+      if (publicView || !authReady || (isCloudConfigured && !user)) return
+      try {
+        const result = await loadPeopleState()
+        if (!ignore) setPeople(result.data)
+      } catch {
+        if (!ignore) setPeople({ members: [], guests: [] })
+      }
+    }
+    hydratePeople()
+    return () => { ignore = true }
+  }, [authReady, user, publicView])
+
   function changeLang(nextLang) {
     setLang(nextLang)
     localStorage.setItem('tm-vote-lang', nextLang)
@@ -704,6 +924,16 @@ export default function ToastmastersVote() {
     }
   }
 
+  async function persistPeople(next) {
+    setSyncStatus(t.syncing)
+    try {
+      await savePeopleState(next)
+      setSyncStatus(t.peopleSaved)
+    } catch {
+      setSyncStatus(t.saveFailed)
+    }
+  }
+
   async function handleLogout() {
     await signOutUser()
     setUser(null)
@@ -712,6 +942,7 @@ export default function ToastmastersVote() {
 
   const nav = useMemo(() => [
     ['admin', t.navAdmin],
+    ['people', t.navPeople],
     ['vote', t.navVote],
     ['share', t.navShare],
     ['results', t.navResults],
@@ -751,7 +982,8 @@ export default function ToastmastersVote() {
         ))}
       </aside>}
       <main className="tm-content">
-        {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={t} />}
+        {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={t} people={people} />}
+        {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={t} />}
         {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={t} />}
         {view === 'success' && <div className="tm-success-card"><h1>{t.thankVote}</h1><p>{t.recorded}</p></div>}
         {view === 'share' && <SharePoster data={data} t={t} />}

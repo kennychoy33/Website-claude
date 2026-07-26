@@ -647,6 +647,58 @@
   background: #f9fbff;
 }
 
+.tm-directory-table {
+  border: 1px solid var(--tm-line);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.tm-directory-head,
+.tm-directory-row {
+  display: grid;
+  min-width: 1040px;
+}
+
+.tm-directory-table.members .tm-directory-head,
+.tm-directory-table.members .tm-directory-row {
+  grid-template-columns: 1.1fr 1.1fr 1.3fr .7fr 1.4fr 1fr .8fr 86px;
+}
+
+.tm-directory-table.guests .tm-directory-head,
+.tm-directory-table.guests .tm-directory-row {
+  grid-template-columns: 1.1fr 1.4fr 1fr 1fr 1fr 1.6fr 86px;
+}
+
+.tm-directory-head span {
+  background: #f2f6fb;
+  color: #52657a;
+  padding: 12px;
+  font-weight: 900;
+  border-right: 1px solid var(--tm-line);
+}
+
+.tm-directory-row {
+  border-top: 1px solid var(--tm-line);
+}
+
+.tm-directory-row input,
+.tm-directory-row select {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-right: 1px solid var(--tm-line);
+  border-radius: 0;
+  padding: 11px 12px;
+  font: inherit;
+  font-weight: 800;
+  color: var(--tm-ink);
+  background: white;
+}
+
+.tm-directory-row button {
+  border-radius: 0;
+}
+
 .tm-success-card {
   max-width: 560px;
   margin: 120px auto;
@@ -791,6 +843,28 @@
 
   .tm-table-row {
     grid-template-columns: 1fr;
+  }
+
+  .tm-directory-head {
+    display: none;
+  }
+
+  .tm-directory-table,
+  .tm-directory-head,
+  .tm-directory-row {
+    min-width: 0;
+  }
+
+  .tm-directory-table.members .tm-directory-row,
+  .tm-directory-table.guests .tm-directory-row {
+    grid-template-columns: 1fr;
+  }
+
+  .tm-directory-row input,
+  .tm-directory-row select,
+  .tm-directory-row button {
+    border-right: 0;
+    border-bottom: 1px solid var(--tm-line);
   }
 
   .tm-share-panel {

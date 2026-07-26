@@ -91,6 +91,55 @@ export const seedState = {
   ],
 }
 
+export const seedPeopleState = {
+  members: [
+    {
+      id: 'm1',
+      name: '郑彩云',
+      englishName: '',
+      email: '',
+      phone: '',
+      pathway: 'Presentation Mastery',
+      level: 'L5',
+      status: 'active',
+      joinedDate: '',
+    },
+    {
+      id: 'm2',
+      name: '徐子淳',
+      englishName: '',
+      email: '',
+      phone: '',
+      pathway: 'Persuasive Influence',
+      level: 'L5',
+      status: 'active',
+      joinedDate: '',
+    },
+    {
+      id: 'm3',
+      name: '李函袀',
+      englishName: '',
+      email: '',
+      phone: '',
+      pathway: '',
+      level: '',
+      status: 'active',
+      joinedDate: '',
+    },
+  ],
+  guests: [
+    {
+      id: 'g1',
+      name: '新嘉宾',
+      email: '',
+      phone: '',
+      introducedBy: '',
+      visitDate: '',
+      notes: '',
+    },
+  ],
+}
+
 export function loadLocalState() {
   try {
     const saved = localStorage.getItem(TM_VOTE_STORAGE_KEY)
@@ -102,6 +151,102 @@ export function loadLocalState() {
 
 export function saveLocalState(next) {
   localStorage.setItem(TM_VOTE_STORAGE_KEY, JSON.stringify(next))
+}
+
+export function loadLocalPeople() {
+  try {
+    const saved = localStorage.getItem(`${TM_VOTE_STORAGE_KEY}-people`)
+    return saved ? JSON.parse(saved) : seedPeopleState
+  } catch {
+    return seedPeopleState
+  }
+}
+
+export function saveLocalPeople(next) {
+  localStorage.setItem(`${TM_VOTE_STORAGE_KEY}-people`, JSON.stringify(next))
+}
+
+export async function loadPeopleState() {
+  if (!isCloudConfigured) {
+    return { data: loadLocalPeople(), source: 'local' }
+  }
+
+  const user = await getCurrentUser()
+  if (!user) {
+    return { data: loadLocalPeople(), source: 'local' }
+  }
+
+  const [{ data: members, error: memberError }, { data: guests, error: guestError }] = await Promise.all([
+    supabase
+      .from('tm_members')
+      .select('*')
+      .eq('owner_id', user.id)
+      .order('name', { ascending: true }),
+    supabase
+      .from('tm_guests')
+      .select('*')
+      .eq('owner_id', user.id)
+      .order('visit_date', { ascending: false }),
+  ])
+
+  if (memberError) throw memberError
+  if (guestError) throw guestError
+
+  return {
+    data: {
+      members: members.map(fromMemberRow),
+      guests: guests.map(fromGuestRow),
+    },
+    source: 'cloud',
+  }
+}
+
+export async function savePeopleState(state) {
+  if (!isCloudConfigured) {
+    saveLocalPeople(state)
+    return { source: 'local' }
+  }
+
+  const user = await getCurrentUser()
+  if (!user) {
+    saveLocalPeople(state)
+    return { source: 'local' }
+  }
+
+  const memberRows = state.members.map(item => toMemberRow(item, user.id))
+  const guestRows = state.guests.map(item => toGuestRow(item, user.id))
+
+  const { error: memberDeleteError } = await supabase
+    .from('tm_members')
+    .delete()
+    .eq('owner_id', user.id)
+
+  if (memberDeleteError) throw memberDeleteError
+
+  if (memberRows.length) {
+    const { error: memberInsertError } = await supabase
+      .from('tm_members')
+      .insert(memberRows)
+
+    if (memberInsertError) throw memberInsertError
+  }
+
+  const { error: guestDeleteError } = await supabase
+    .from('tm_guests')
+    .delete()
+    .eq('owner_id', user.id)
+
+  if (guestDeleteError) throw guestDeleteError
+
+  if (guestRows.length) {
+    const { error: guestInsertError } = await supabase
+      .from('tm_guests')
+      .insert(guestRows)
+
+    if (guestInsertError) throw guestInsertError
+  }
+
+  return { source: 'cloud' }
 }
 
 export async function loadVoteState(spaceId = '') {
@@ -314,5 +459,59 @@ function fromHistoryRow(row) {
     impromptuVotes: row.impromptu_votes,
     evaluatorWinner: row.evaluator_winner,
     evaluatorVotes: row.evaluator_votes,
+  }
+}
+
+function toMemberRow(item, ownerId) {
+  return {
+    id: item.id,
+    owner_id: ownerId,
+    name: item.name,
+    english_name: item.englishName || '',
+    email: item.email || '',
+    phone: item.phone || '',
+    pathway: item.pathway || '',
+    level: item.level || '',
+    status: item.status || 'active',
+    joined_date: item.joinedDate || null,
+  }
+}
+
+function fromMemberRow(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    englishName: row.english_name || '',
+    email: row.email || '',
+    phone: row.phone || '',
+    pathway: row.pathway || '',
+    level: row.level || '',
+    status: row.status || 'active',
+    joinedDate: row.joined_date || '',
+  }
+}
+
+function toGuestRow(item, ownerId) {
+  return {
+    id: item.id,
+    owner_id: ownerId,
+    name: item.name,
+    email: item.email || '',
+    phone: item.phone || '',
+    introduced_by: item.introducedBy || '',
+    visit_date: item.visitDate || null,
+    notes: item.notes || '',
+  }
+}
+
+function fromGuestRow(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email || '',
+    phone: row.phone || '',
+    introducedBy: row.introduced_by || '',
+    visitDate: row.visit_date || '',
+    notes: row.notes || '',
   }
 }
