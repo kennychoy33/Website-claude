@@ -218,6 +218,23 @@
   font-size: 24px;
 }
 
+.tm-note-panel {
+  background: #fff9ec;
+  border-color: #ead09a;
+}
+
+.tm-note-panel p {
+  margin: 0 0 10px;
+  color: #5d4620;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.tm-note-panel p:last-child {
+  margin-bottom: 0;
+}
+
 .tm-form-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);

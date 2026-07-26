@@ -151,6 +151,14 @@ export const seedMeetingOpsState = {
   ],
 }
 
+export const seedSystemSettings = {
+  clubName: '柔南区麻坡中华校友会讲演会',
+  clubShort: '中华讲演会',
+  toastmasterId: '',
+  adminName: '',
+  username: '',
+}
+
 export function loadLocalState() {
   try {
     const saved = localStorage.getItem(TM_VOTE_STORAGE_KEY)
@@ -188,6 +196,63 @@ export function loadLocalMeetingOps() {
 
 export function saveLocalMeetingOps(next) {
   localStorage.setItem(`${TM_VOTE_STORAGE_KEY}-meeting-ops`, JSON.stringify(next))
+}
+
+export function loadLocalSystemSettings() {
+  try {
+    const saved = localStorage.getItem(`${TM_VOTE_STORAGE_KEY}-system-settings`)
+    return saved ? { ...seedSystemSettings, ...JSON.parse(saved) } : seedSystemSettings
+  } catch {
+    return seedSystemSettings
+  }
+}
+
+export function saveLocalSystemSettings(next) {
+  localStorage.setItem(`${TM_VOTE_STORAGE_KEY}-system-settings`, JSON.stringify(next))
+}
+
+export async function loadSystemSettings(spaceId = '') {
+  if (!isCloudConfigured) {
+    return { data: loadLocalSystemSettings(), source: 'local' }
+  }
+
+  const user = await getCurrentUser()
+  if (!user && !spaceId) {
+    return { data: loadLocalSystemSettings(), source: 'local' }
+  }
+
+  const ownerId = spaceId || user.id
+
+  const { data, error } = await supabase
+    .from('tm_club_settings')
+    .select('*')
+    .eq('owner_id', ownerId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) return { data: seedSystemSettings, source: 'cloud' }
+
+  return { data: fromSystemSettingsRow(data), source: 'cloud' }
+}
+
+export async function saveSystemSettings(settings) {
+  if (!isCloudConfigured) {
+    saveLocalSystemSettings(settings)
+    return { source: 'local' }
+  }
+
+  const user = await getCurrentUser()
+  if (!user) {
+    saveLocalSystemSettings(settings)
+    return { source: 'local' }
+  }
+
+  const { error } = await supabase
+    .from('tm_club_settings')
+    .upsert(toSystemSettingsRow(settings, user.id), { onConflict: 'owner_id' })
+
+  if (error) throw error
+  return { source: 'cloud' }
 }
 
 export async function loadPeopleState() {
@@ -663,5 +728,27 @@ function fromRoleRow(row) {
     roleName: row.role_name,
     personType: row.person_type,
     personId: row.person_id,
+  }
+}
+
+function toSystemSettingsRow(settings, ownerId) {
+  return {
+    owner_id: ownerId,
+    club_name: settings.clubName,
+    club_short: settings.clubShort,
+    toastmaster_id: settings.toastmasterId,
+    admin_name: settings.adminName,
+    username: settings.username,
+    updated_at: new Date().toISOString(),
+  }
+}
+
+function fromSystemSettingsRow(row) {
+  return {
+    clubName: row.club_name || seedSystemSettings.clubName,
+    clubShort: row.club_short || seedSystemSettings.clubShort,
+    toastmasterId: row.toastmaster_id || '',
+    adminName: row.admin_name || '',
+    username: row.username || '',
   }
 }

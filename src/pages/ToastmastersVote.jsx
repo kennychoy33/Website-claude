@@ -8,12 +8,14 @@ import {
   loadMeetingOpsState,
   loadPeopleState,
   loadLocalState,
+  loadSystemSettings,
   loadVoteState,
   markLocalVoted,
   onAuthChange,
   saveVoteState,
   saveMeetingOpsState,
   savePeopleState,
+  saveSystemSettings,
   signInWithEmail,
   signOutUser,
   signUpWithEmail,
@@ -24,6 +26,7 @@ import './ToastmastersVote.css'
 const LANG = {
   zh: {
     navAdmin: '投票设置',
+    navSystem: '系统设定',
     navPeople: '会员嘉宾',
     navMeeting: '例会管理',
     navVote: '投票页面',
@@ -139,9 +142,20 @@ const LANG = {
     preparedSpeakers: '备稿讲员',
     evaluators: '评估员',
     tableTopics: '即席讲员',
+    systemTitle: '系统设定',
+    systemSubtitle: '设定分会名称和维护账号资料。投票者只需要 QR code，不需要登录。',
+    clubName: '分会名称',
+    clubShortName: '分会简称',
+    toastmasterId: 'Toastmaster ID',
+    adminName: '管理员姓名',
+    username: 'User Name',
+    systemSaved: '系统设定已保存',
+    accountNote: '目前登录使用 Email + 密码。User Name 和 Toastmaster ID 会保存为分会管理资料，之后可用于 Master 管理账号。',
+    masterNote: 'Master Login / 开账号需要 Supabase Admin 或 Edge Function 才能安全建立；前端不能直接保存 master 密钥。',
   },
   en: {
     navAdmin: 'Setup',
+    navSystem: 'System Settings',
     navPeople: 'Members & Guests',
     navMeeting: 'Meeting & Agenda',
     navVote: 'Voting Page',
@@ -257,6 +271,16 @@ const LANG = {
     preparedSpeakers: 'Prepared Speakers',
     evaluators: 'Evaluators',
     tableTopics: 'Table Topics',
+    systemTitle: 'System Settings',
+    systemSubtitle: 'Configure club identity and admin profile. Voters only need the QR code, no login required.',
+    clubName: 'Club Name',
+    clubShortName: 'Club Short Name',
+    toastmasterId: 'Toastmaster ID',
+    adminName: 'Admin Name',
+    username: 'User Name',
+    systemSaved: 'System settings saved',
+    accountNote: 'Login currently uses Email + Password. User Name and Toastmaster ID are saved as club admin details for future master account management.',
+    masterNote: 'Master Login / account provisioning needs Supabase Admin or an Edge Function to be secure; the frontend must not store master secrets.',
   },
 }
 
@@ -528,6 +552,61 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
         <div className="tm-stat-row"><span>{t.totalVotes}</span><b>{savedVotes}</b></div>
         <div className="tm-stat-row"><span>{t.voteStatus}</span><b>{meetingStatusLabel(data.meeting.status, t)}</b></div>
       </aside>
+    </div>
+  )
+}
+
+function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus, t }) {
+  function update(field, value) {
+    setSettings({ ...settings, [field]: value })
+  }
+
+  return (
+    <div className="tm-main-column">
+      <div className="tm-screen-head">
+        <div>
+          <h1>{t.systemTitle}</h1>
+          <p>{t.systemSubtitle}</p>
+          {syncStatus && <div className="tm-sync-badge"><b>{syncStatus}</b></div>}
+        </div>
+        <div className="tm-actions">
+          <button className="tm-gold" onClick={() => persistSettings(settings)}>{t.save}</button>
+        </div>
+      </div>
+
+      <section className="tm-panel">
+        <div className="tm-panel-title">
+          <span className="tm-icon">⚙</span>
+          <h2>{t.navSystem}</h2>
+        </div>
+        <div className="tm-form-grid">
+          <label>
+            <span>{t.clubName}</span>
+            <input value={settings.clubName} onChange={event => update('clubName', event.target.value)} />
+          </label>
+          <label>
+            <span>{t.clubShortName}</span>
+            <input value={settings.clubShort} onChange={event => update('clubShort', event.target.value)} />
+          </label>
+          <label>
+            <span>{t.toastmasterId}</span>
+            <input value={settings.toastmasterId} onChange={event => update('toastmasterId', event.target.value)} />
+          </label>
+          <label>
+            <span>{t.username}</span>
+            <input value={settings.username} onChange={event => update('username', event.target.value)} />
+          </label>
+          <label>
+            <span>{t.adminName}</span>
+            <input value={settings.adminName} onChange={event => update('adminName', event.target.value)} />
+          </label>
+        </div>
+      </section>
+
+      <section className="tm-panel tm-note-panel">
+        <p>{t.accountNote}</p>
+        <p>{t.masterNote}</p>
+      </section>
     </div>
   )
 }
@@ -1086,6 +1165,7 @@ export default function ToastmastersVote() {
   const [data, setData] = useState(null)
   const [people, setPeople] = useState({ members: [], guests: [] })
   const [meetingOps, setMeetingOps] = useState({ attendance: [], roles: [] })
+  const [settings, setSettings] = useState({ clubName: '', clubShort: '', toastmasterId: '', adminName: '', username: '' })
   const publicView = new URLSearchParams(window.location.search).get('view') === 'vote'
   const publicSpace = new URLSearchParams(window.location.search).get('space') || ''
   const [view, setView] = useState(publicView ? 'vote' : 'admin')
@@ -1095,6 +1175,11 @@ export default function ToastmastersVote() {
   const [source, setSource] = useState(isCloudConfigured ? 'cloud' : 'local')
   const [syncStatus, setSyncStatus] = useState('')
   const t = LANG[lang]
+  const appText = {
+    ...t,
+    club: settings.clubName || t.club,
+    clubShort: settings.clubShort || t.clubShort,
+  }
 
   useEffect(() => {
     if (!isCloudConfigured || publicView) return undefined
@@ -1155,6 +1240,21 @@ export default function ToastmastersVote() {
 
   useEffect(() => {
     let ignore = false
+    async function hydrateSettings() {
+      if (!authReady || (!publicView && isCloudConfigured && !user)) return
+      try {
+        const result = await loadSystemSettings(publicView ? publicSpace : '')
+        if (!ignore) setSettings(result.data)
+      } catch {
+        if (!ignore) setSettings({ clubName: t.club, clubShort: t.clubShort, toastmasterId: '', adminName: '', username: '' })
+      }
+    }
+    hydrateSettings()
+    return () => { ignore = true }
+  }, [authReady, user, publicView, publicSpace])
+
+  useEffect(() => {
+    let ignore = false
     async function hydrateMeetingOps() {
       if (publicView || !authReady || (isCloudConfigured && !user) || !data?.meeting?.id) return
       try {
@@ -1204,6 +1304,16 @@ export default function ToastmastersVote() {
     }
   }
 
+  async function persistSettings(next) {
+    setSyncStatus(t.syncing)
+    try {
+      await saveSystemSettings(next)
+      setSyncStatus(t.systemSaved)
+    } catch {
+      setSyncStatus(t.saveFailed)
+    }
+  }
+
   async function handleLogout() {
     await signOutUser()
     setUser(null)
@@ -1211,6 +1321,7 @@ export default function ToastmastersVote() {
   }
 
   const nav = useMemo(() => [
+    ['system', t.navSystem],
     ['admin', t.navAdmin],
     ['people', t.navPeople],
     ['meeting', t.navMeeting],
@@ -1221,7 +1332,7 @@ export default function ToastmastersVote() {
   ], [t])
 
   if (!authReady) {
-    return <div className="tm-success-card"><h2>{t.syncing}</h2></div>
+    return <div className="tm-success-card"><h2>{appText.syncing}</h2></div>
   }
 
   if (!publicView && isCloudConfigured && !user) {
@@ -1233,10 +1344,10 @@ export default function ToastmastersVote() {
       <div className={`tm-page ${publicView ? 'public' : ''}`}>
         {!publicView && <aside className="tm-sidebar">
           <div className="tm-brand">TM Vote</div>
-          <LanguageToggle lang={lang} setLang={changeLang} t={t} />
+          <LanguageToggle lang={lang} setLang={changeLang} t={appText} />
         </aside>}
         <main className="tm-content">
-          <div className="tm-success-card"><h2>{t.syncing}</h2></div>
+          <div className="tm-success-card"><h2>{appText.syncing}</h2></div>
         </main>
       </div>
     )
@@ -1245,22 +1356,23 @@ export default function ToastmastersVote() {
   return (
     <div className={`tm-page ${publicView ? 'public' : ''}`}>
       {!publicView && <aside className="tm-sidebar">
-        <div className="tm-brand">TM Vote</div>
-        <LanguageToggle lang={lang} setLang={changeLang} t={t} />
-        {isCloudConfigured && <button onClick={handleLogout}>{t.logout}</button>}
+        <div className="tm-brand">{appText.clubShort}</div>
+        <LanguageToggle lang={lang} setLang={changeLang} t={appText} />
+        {isCloudConfigured && <button onClick={handleLogout}>{appText.logout}</button>}
         {nav.map(([key, label]) => (
           <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
         ))}
       </aside>}
       <main className="tm-content">
-        {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={t} people={people} />}
-        {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={t} />}
-        {view === 'meeting' && <MeetingView data={data} people={people} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={t} />}
-        {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={t} />}
-        {view === 'success' && <div className="tm-success-card"><h1>{t.thankVote}</h1><p>{t.recorded}</p></div>}
-        {view === 'share' && <SharePoster data={data} t={t} />}
-        {view === 'results' && <ResultsView data={data} t={t} />}
-        {view === 'history' && <HistoryView data={data} t={t} />}
+        {view === 'system' && <SystemSettingsView settings={settings} setSettings={setSettings} persistSettings={persistSettings} syncStatus={syncStatus} t={appText} />}
+        {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} />}
+        {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={appText} />}
+        {view === 'meeting' && <MeetingView data={data} people={people} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={appText} />}
+        {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={appText} />}
+        {view === 'success' && <div className="tm-success-card"><h1>{appText.thankVote}</h1><p>{appText.recorded}</p></div>}
+        {view === 'share' && <SharePoster data={data} t={appText} />}
+        {view === 'results' && <ResultsView data={data} t={appText} />}
+        {view === 'history' && <HistoryView data={data} t={appText} />}
       </main>
     </div>
   )
