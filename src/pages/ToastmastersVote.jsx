@@ -26,7 +26,8 @@ import './ToastmastersVote.css'
 const LANG = {
   zh: {
     navAdmin: '投票设置',
-    navSystem: '系统设定',
+    navSystem: '分会资料设定',
+    navMaster: '系统管理',
     navPeople: '会员嘉宾',
     navMeeting: '例会管理',
     navVote: '投票页面',
@@ -142,20 +143,32 @@ const LANG = {
     preparedSpeakers: '备稿讲员',
     evaluators: '评估员',
     tableTopics: '即席讲员',
-    systemTitle: '系统设定',
-    systemSubtitle: '设定分会名称和维护账号资料。投票者只需要 QR code，不需要登录。',
+    systemTitle: '分会资料设定',
+    systemSubtitle: '维护分会名称、Logo、例会表模板和分会管理者。投票者只需要 QR code，不需要登录。',
     clubName: '分会名称',
     clubShortName: '分会简称',
     toastmasterId: 'Toastmaster ID',
     adminName: '管理员姓名',
     username: 'User Name',
     systemSaved: '系统设定已保存',
-    accountNote: '目前登录使用 Email + 密码。User Name 和 Toastmaster ID 会保存为分会管理资料，之后可用于 Master 管理账号。',
-    masterNote: 'Master Login / 开账号需要 Supabase Admin 或 Edge Function 才能安全建立；前端不能直接保存 master 密钥。',
+    accountNote: '这里可以记录分会管理者资料。正式上线时，密码应由系统管理通过 Supabase Auth / Edge Function 建立，不建议长期保存明文密码。',
+    masterNote: '系统管理是给最高管理者新建分会、分会管理者 ID 和密码使用。',
+    logoUpload: '上传分会 Logo',
+    agendaTemplate: '上传例会表 Template',
+    clubAdmins: '分会管理者',
+    addClubAdmin: '+ 加入管理者',
+    masterTitle: '系统管理',
+    masterSubtitle: '最高管理者用于新建分会、分配 Toastmaster ID、User Name 和初始 Password。',
+    createClub: '新建分会',
+    newMeeting: '新建例会',
+    importAgenda: '导入例会表 / Excel',
+    exportExcel: '导出 Excel',
+    templateReady: '已上传模板',
   },
   en: {
     navAdmin: 'Setup',
-    navSystem: 'System Settings',
+    navSystem: 'Club Profile Settings',
+    navMaster: 'System Admin',
     navPeople: 'Members & Guests',
     navMeeting: 'Meeting & Agenda',
     navVote: 'Voting Page',
@@ -271,16 +284,27 @@ const LANG = {
     preparedSpeakers: 'Prepared Speakers',
     evaluators: 'Evaluators',
     tableTopics: 'Table Topics',
-    systemTitle: 'System Settings',
-    systemSubtitle: 'Configure club identity and admin profile. Voters only need the QR code, no login required.',
+    systemTitle: 'Club Profile Settings',
+    systemSubtitle: 'Manage club name, logo, agenda template, and club admins. Voters only need the QR code, no login required.',
     clubName: 'Club Name',
     clubShortName: 'Club Short Name',
     toastmasterId: 'Toastmaster ID',
     adminName: 'Admin Name',
     username: 'User Name',
     systemSaved: 'System settings saved',
-    accountNote: 'Login currently uses Email + Password. User Name and Toastmaster ID are saved as club admin details for future master account management.',
-    masterNote: 'Master Login / account provisioning needs Supabase Admin or an Edge Function to be secure; the frontend must not store master secrets.',
+    accountNote: 'Club admin details can be recorded here. In production, passwords should be provisioned by System Admin through Supabase Auth / Edge Function, not stored as long-term plain text.',
+    masterNote: 'System Admin is for the owner to create clubs, club admin IDs, and initial passwords.',
+    logoUpload: 'Upload Club Logo',
+    agendaTemplate: 'Upload Agenda Template',
+    clubAdmins: 'Club Admins',
+    addClubAdmin: '+ Add Admin',
+    masterTitle: 'System Admin',
+    masterSubtitle: 'Owner-only area to create clubs, Toastmaster IDs, user names, and initial passwords.',
+    createClub: 'Create Club',
+    newMeeting: 'New Meeting',
+    importAgenda: 'Import Agenda / Excel',
+    exportExcel: 'Export Excel',
+    templateReady: 'Template uploaded',
   },
 }
 
@@ -561,6 +585,44 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
     setSettings({ ...settings, [field]: value })
   }
 
+  function updateAdmin(id, field, value) {
+    setSettings({
+      ...settings,
+      clubAdmins: (settings.clubAdmins || []).map(item => item.id === id ? { ...item, [field]: value } : item),
+    })
+  }
+
+  function addAdmin() {
+    setSettings({
+      ...settings,
+      clubAdmins: [
+        ...(settings.clubAdmins || []),
+        { id: `a${Date.now()}`, toastmasterId: '', username: '', password: '', name: '' },
+      ],
+    })
+  }
+
+  function removeAdmin(id) {
+    setSettings({
+      ...settings,
+      clubAdmins: (settings.clubAdmins || []).filter(item => item.id !== id),
+    })
+  }
+
+  function readFile(event, field, nameField = '') {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      setSettings({
+        ...settings,
+        [field]: reader.result,
+        ...(nameField ? { [nameField]: file.name } : {}),
+      })
+    }
+    reader.readAsDataURL(file)
+  }
+
   return (
     <div className="tm-main-column">
       <div className="tm-screen-head">
@@ -603,9 +665,101 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
         </div>
       </section>
 
+      <section className="tm-panel">
+        <div className="tm-panel-title">
+          <span className="tm-icon">▣</span>
+          <h2>{t.logoUpload}</h2>
+        </div>
+        <div className="tm-upload-grid">
+          <label className="tm-upload-box">
+            <span>{t.logoUpload}</span>
+            <input type="file" accept="image/*" onChange={event => readFile(event, 'logoDataUrl')} />
+          </label>
+          <div className="tm-logo-preview">
+            {settings.logoDataUrl ? <img src={settings.logoDataUrl} alt={t.logoUpload} /> : <span>{t.clubShort}</span>}
+          </div>
+          <label className="tm-upload-box">
+            <span>{t.agendaTemplate}</span>
+            <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" onChange={event => readFile(event, 'agendaTemplateDataUrl', 'agendaTemplateName')} />
+          </label>
+          <div className="tm-template-preview">
+            <b>{settings.agendaTemplateName || t.pending}</b>
+            {settings.agendaTemplateName && <small>{t.templateReady}</small>}
+          </div>
+        </div>
+      </section>
+
+      <section className="tm-panel">
+        <div className="tm-panel-title">
+          <span className="tm-icon">👤</span>
+          <h2>{t.clubAdmins}</h2>
+        </div>
+        <div className="tm-directory-table admins">
+          <div className="tm-directory-head">
+            <span>{t.toastmasterId}</span>
+            <span>{t.username}</span>
+            <span>{t.password}</span>
+            <span>{t.adminName}</span>
+            <span>{t.action}</span>
+          </div>
+          {(settings.clubAdmins || []).map(item => (
+            <div className="tm-directory-row" key={item.id}>
+              <input value={item.toastmasterId} onChange={event => updateAdmin(item.id, 'toastmasterId', event.target.value)} />
+              <input value={item.username} onChange={event => updateAdmin(item.id, 'username', event.target.value)} />
+              <input value={item.password} type="password" onChange={event => updateAdmin(item.id, 'password', event.target.value)} />
+              <input value={item.name} onChange={event => updateAdmin(item.id, 'name', event.target.value)} />
+              <button className="tm-danger" onClick={() => removeAdmin(item.id)}>{t.remove}</button>
+            </div>
+          ))}
+        </div>
+        <button className="tm-outline" onClick={addAdmin}>{t.addClubAdmin}</button>
+      </section>
+
       <section className="tm-panel tm-note-panel">
         <p>{t.accountNote}</p>
         <p>{t.masterNote}</p>
+      </section>
+    </div>
+  )
+}
+
+function MasterAdminView({ settings, t }) {
+  const admins = settings.clubAdmins || []
+
+  return (
+    <div className="tm-main-column">
+      <div className="tm-screen-head">
+        <div>
+          <h1>{t.masterTitle}</h1>
+          <p>{t.masterSubtitle}</p>
+        </div>
+        <div className="tm-actions">
+          <button className="tm-gold">{t.createClub}</button>
+        </div>
+      </div>
+      <section className="tm-panel">
+        <div className="tm-panel-title">
+          <span className="tm-icon">☷</span>
+          <h2>{t.clubAdmins}</h2>
+        </div>
+        <div className="tm-master-list">
+          <div>
+            <span>{t.clubName}</span>
+            <b>{settings.clubName || t.club}</b>
+          </div>
+          <div>
+            <span>{t.toastmasterId}</span>
+            <b>{settings.toastmasterId || t.pending}</b>
+          </div>
+          <div>
+            <span>{t.clubAdmins}</span>
+            <b>{admins.length}</b>
+          </div>
+        </div>
+      </section>
+      <section className="tm-panel tm-note-panel">
+        <p>{t.masterNote}</p>
+        <p>{t.accountNote}</p>
       </section>
     </div>
   )
@@ -966,7 +1120,7 @@ function PersonSelect({ people, personType, personId, onChange, t }) {
   )
 }
 
-function MeetingView({ data, people, meetingOps, setMeetingOps, persistMeetingOps, syncStatus, t }) {
+function MeetingView({ data, setData, persistState, people, meetingOps, setMeetingOps, persistMeetingOps, syncStatus, t, settings }) {
   const attendanceIndex = new Map(meetingOps.attendance.map(item => [`${item.personType}:${item.personId}`, item.attended]))
   const attendanceRows = [
     ...people.members.map(item => ({ personType: 'member', personId: item.id, name: item.name })),
@@ -1007,6 +1161,60 @@ function MeetingView({ data, people, meetingOps, setMeetingOps, persistMeetingOp
     setMeetingOps({ ...meetingOps, roles: meetingOps.roles.filter(item => item.id !== id) })
   }
 
+  function createMeeting() {
+    const next = {
+      ...data,
+      meeting: {
+        ...data.meeting,
+        id: `${Date.now()}`,
+        number: '',
+        date: new Date().toISOString().slice(0, 10),
+        theme: '',
+        word: '',
+        closeTime: '',
+        status: 'draft',
+      },
+      prepared: [],
+      impromptu: [],
+      evaluator: [],
+    }
+    setData(next)
+    setMeetingOps({
+      attendance: [],
+      roles: [
+        { id: `r${Date.now()}1`, roleName: 'Toastmaster of the Evening', personType: 'member', personId: '' },
+        { id: `r${Date.now()}2`, roleName: 'Timer', personType: 'member', personId: '' },
+        { id: `r${Date.now()}3`, roleName: 'Ah Counter', personType: 'member', personId: '' },
+        { id: `r${Date.now()}4`, roleName: 'Grammarian', personType: 'member', personId: '' },
+        { id: `r${Date.now()}5`, roleName: 'General Evaluator', personType: 'member', personId: '' },
+      ],
+    })
+  }
+
+  function importAgendaFile(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    window.alert(`${t.importAgenda}: ${file.name}`)
+  }
+
+  function exportExcel() {
+    const rows = [
+      ['Section', 'Role/Type', 'Name', 'Detail'],
+      ...meetingOps.roles.map(item => ['Role', item.roleName, personLabel(people, item.personType, item.personId), '']),
+      ...data.prepared.map(item => ['Prepared Speaker', item.project || '', item.name, item.title || '']),
+      ...data.evaluator.map(item => ['Evaluator', '', item.name, '']),
+      ...data.impromptu.map(item => ['Table Topics', '', item.name, '']),
+    ]
+    const csv = rows.map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${data.meeting.number || 'meeting'}-agenda.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="tm-main-column">
       <div className="tm-screen-head no-print">
@@ -1016,7 +1224,14 @@ function MeetingView({ data, people, meetingOps, setMeetingOps, persistMeetingOp
           {syncStatus && <div className="tm-sync-badge"><b>{syncStatus}</b></div>}
         </div>
         <div className="tm-actions">
+          <button onClick={createMeeting}>{t.newMeeting}</button>
+          <label className="tm-file-action">
+            {t.importAgenda}
+            <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv" onChange={importAgendaFile} />
+          </label>
+          <button onClick={exportExcel}>{t.exportExcel}</button>
           <button className="tm-gold" onClick={() => persistMeetingOps(meetingOps)}>{t.save}</button>
+          <button onClick={() => persistState(data)}>{t.save}</button>
           <button onClick={addRole}>{t.addRole}</button>
           <button onClick={() => window.print()}>{t.printAgenda}</button>
         </div>
@@ -1074,6 +1289,7 @@ function MeetingView({ data, people, meetingOps, setMeetingOps, persistMeetingOp
 
       <section className="tm-agenda-print">
         <header>
+          {settings.logoDataUrl && <img className="tm-agenda-logo" src={settings.logoDataUrl} alt={t.clubShort} />}
           <h1>{t.club}</h1>
           <h2>{data.meeting.number} {t.regularMeeting}</h2>
           <p>{data.meeting.date} | {data.meeting.theme} | {t.word}: {data.meeting.word}</p>
@@ -1165,10 +1381,20 @@ export default function ToastmastersVote() {
   const [data, setData] = useState(null)
   const [people, setPeople] = useState({ members: [], guests: [] })
   const [meetingOps, setMeetingOps] = useState({ attendance: [], roles: [] })
-  const [settings, setSettings] = useState({ clubName: '', clubShort: '', toastmasterId: '', adminName: '', username: '' })
+  const [settings, setSettings] = useState({
+    clubName: '',
+    clubShort: '',
+    toastmasterId: '',
+    adminName: '',
+    username: '',
+    logoDataUrl: '',
+    agendaTemplateName: '',
+    agendaTemplateDataUrl: '',
+    clubAdmins: [],
+  })
   const publicView = new URLSearchParams(window.location.search).get('view') === 'vote'
   const publicSpace = new URLSearchParams(window.location.search).get('space') || ''
-  const [view, setView] = useState(publicView ? 'vote' : 'admin')
+  const [view, setView] = useState(publicView ? 'vote' : 'system')
   const [lang, setLang] = useState(() => localStorage.getItem('tm-vote-lang') || 'zh')
   const [user, setUser] = useState(null)
   const [authReady, setAuthReady] = useState(!isCloudConfigured || publicView)
@@ -1246,7 +1472,7 @@ export default function ToastmastersVote() {
         const result = await loadSystemSettings(publicView ? publicSpace : '')
         if (!ignore) setSettings(result.data)
       } catch {
-        if (!ignore) setSettings({ clubName: t.club, clubShort: t.clubShort, toastmasterId: '', adminName: '', username: '' })
+        if (!ignore) setSettings({ clubName: t.club, clubShort: t.clubShort, toastmasterId: '', adminName: '', username: '', logoDataUrl: '', agendaTemplateName: '', agendaTemplateDataUrl: '', clubAdmins: [] })
       }
     }
     hydrateSettings()
@@ -1322,13 +1548,17 @@ export default function ToastmastersVote() {
 
   const nav = useMemo(() => [
     ['system', t.navSystem],
-    ['admin', t.navAdmin],
-    ['people', t.navPeople],
     ['meeting', t.navMeeting],
+    ['people', t.navPeople],
+    ['admin', t.navAdmin],
     ['vote', t.navVote],
     ['share', t.navShare],
     ['results', t.navResults],
     ['history', t.navHistory],
+  ], [t])
+
+  const masterNav = useMemo(() => [
+    ['master', t.navMaster],
   ], [t])
 
   if (!authReady) {
@@ -1362,12 +1592,18 @@ export default function ToastmastersVote() {
         {nav.map(([key, label]) => (
           <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
         ))}
+        <div className="tm-sidebar-bottom">
+          {masterNav.map(([key, label]) => (
+            <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
+          ))}
+        </div>
       </aside>}
       <main className="tm-content">
         {view === 'system' && <SystemSettingsView settings={settings} setSettings={setSettings} persistSettings={persistSettings} syncStatus={syncStatus} t={appText} />}
+        {view === 'master' && <MasterAdminView settings={settings} t={appText} />}
         {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} />}
         {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={appText} />}
-        {view === 'meeting' && <MeetingView data={data} people={people} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={appText} />}
+        {view === 'meeting' && <MeetingView data={data} setData={setData} persistState={persistState} people={people} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={appText} settings={settings} />}
         {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={appText} />}
         {view === 'success' && <div className="tm-success-card"><h1>{appText.thankVote}</h1><p>{appText.recorded}</p></div>}
         {view === 'share' && <SharePoster data={data} t={appText} />}

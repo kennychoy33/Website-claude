@@ -56,9 +56,22 @@ create table if not exists public.tm_club_settings (
   toastmaster_id text,
   admin_name text,
   username text,
+  logo_data_url text,
+  agenda_template_name text,
+  agenda_template_data_url text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (owner_id)
+);
+
+create table if not exists public.tm_club_admins (
+  id text primary key,
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  toastmaster_id text,
+  username text,
+  password_hint text,
+  name text,
+  created_at timestamptz not null default now()
 );
 
 create table if not exists public.tm_members (
@@ -114,6 +127,13 @@ create index if not exists tm_guests_owner_idx on public.tm_guests(owner_id);
 create index if not exists tm_attendance_owner_meeting_idx on public.tm_meeting_attendance(owner_id, meeting_id);
 create index if not exists tm_roles_owner_meeting_idx on public.tm_meeting_roles(owner_id, meeting_id);
 create index if not exists tm_club_settings_owner_idx on public.tm_club_settings(owner_id);
+
+alter table public.tm_club_settings
+  add column if not exists logo_data_url text,
+  add column if not exists agenda_template_name text,
+  add column if not exists agenda_template_data_url text;
+
+create index if not exists tm_club_admins_owner_idx on public.tm_club_admins(owner_id);
 
 alter table public.tm_meetings
   add column if not exists owner_id uuid references auth.users(id) on delete cascade;
@@ -183,6 +203,7 @@ alter table public.tm_candidates enable row level security;
 alter table public.tm_votes enable row level security;
 alter table public.tm_winner_history enable row level security;
 alter table public.tm_club_settings enable row level security;
+alter table public.tm_club_admins enable row level security;
 alter table public.tm_members enable row level security;
 alter table public.tm_guests enable row level security;
 alter table public.tm_meeting_attendance enable row level security;
@@ -200,6 +221,7 @@ drop policy if exists "tm history public read" on public.tm_winner_history;
 drop policy if exists "tm history public write" on public.tm_winner_history;
 drop policy if exists "tm club settings public read" on public.tm_club_settings;
 drop policy if exists "tm club settings owner all" on public.tm_club_settings;
+drop policy if exists "tm club admins owner all" on public.tm_club_admins;
 drop policy if exists "tm members owner all" on public.tm_members;
 drop policy if exists "tm guests owner all" on public.tm_guests;
 drop policy if exists "tm attendance owner all" on public.tm_meeting_attendance;
@@ -288,6 +310,12 @@ using (true);
 
 create policy "tm club settings owner all"
 on public.tm_club_settings for all
+to authenticated
+using (owner_id = (select auth.uid()))
+with check (owner_id = (select auth.uid()));
+
+create policy "tm club admins owner all"
+on public.tm_club_admins for all
 to authenticated
 using (owner_id = (select auth.uid()))
 with check (owner_id = (select auth.uid()));

@@ -157,6 +157,12 @@ export const seedSystemSettings = {
   toastmasterId: '',
   adminName: '',
   username: '',
+  logoDataUrl: '',
+  agendaTemplateName: '',
+  agendaTemplateDataUrl: '',
+  clubAdmins: [
+    { id: 'a1', toastmasterId: '', username: '', password: '', name: '' },
+  ],
 }
 
 export function loadLocalState() {
@@ -225,14 +231,26 @@ export async function loadSystemSettings(spaceId = '') {
 
   const { data, error } = await supabase
     .from('tm_club_settings')
-    .select('*')
+    .select('owner_id, club_name, club_short, toastmaster_id, admin_name, username, logo_data_url, agenda_template_name, agenda_template_data_url')
     .eq('owner_id', ownerId)
     .maybeSingle()
 
   if (error) throw error
   if (!data) return { data: seedSystemSettings, source: 'cloud' }
 
-  return { data: fromSystemSettingsRow(data), source: 'cloud' }
+  let clubAdmins = seedSystemSettings.clubAdmins
+  if (user && !spaceId) {
+    const { data: admins, error: adminsError } = await supabase
+      .from('tm_club_admins')
+      .select('*')
+      .eq('owner_id', user.id)
+      .order('created_at', { ascending: true })
+
+    if (adminsError) throw adminsError
+    clubAdmins = admins.length ? admins.map(fromClubAdminRow) : seedSystemSettings.clubAdmins
+  }
+
+  return { data: { ...fromSystemSettingsRow(data), clubAdmins }, source: 'cloud' }
 }
 
 export async function saveSystemSettings(settings) {
@@ -252,6 +270,23 @@ export async function saveSystemSettings(settings) {
     .upsert(toSystemSettingsRow(settings, user.id), { onConflict: 'owner_id' })
 
   if (error) throw error
+
+  const { error: deleteAdminsError } = await supabase
+    .from('tm_club_admins')
+    .delete()
+    .eq('owner_id', user.id)
+
+  if (deleteAdminsError) throw deleteAdminsError
+
+  const adminRows = (settings.clubAdmins || []).map(item => toClubAdminRow(item, user.id))
+  if (adminRows.length) {
+    const { error: insertAdminsError } = await supabase
+      .from('tm_club_admins')
+      .insert(adminRows)
+
+    if (insertAdminsError) throw insertAdminsError
+  }
+
   return { source: 'cloud' }
 }
 
@@ -739,6 +774,9 @@ function toSystemSettingsRow(settings, ownerId) {
     toastmaster_id: settings.toastmasterId,
     admin_name: settings.adminName,
     username: settings.username,
+    logo_data_url: settings.logoDataUrl,
+    agenda_template_name: settings.agendaTemplateName,
+    agenda_template_data_url: settings.agendaTemplateDataUrl,
     updated_at: new Date().toISOString(),
   }
 }
@@ -750,5 +788,29 @@ function fromSystemSettingsRow(row) {
     toastmasterId: row.toastmaster_id || '',
     adminName: row.admin_name || '',
     username: row.username || '',
+    logoDataUrl: row.logo_data_url || '',
+    agendaTemplateName: row.agenda_template_name || '',
+    agendaTemplateDataUrl: row.agenda_template_data_url || '',
+  }
+}
+
+function toClubAdminRow(admin, ownerId) {
+  return {
+    id: admin.id,
+    owner_id: ownerId,
+    toastmaster_id: admin.toastmasterId,
+    username: admin.username,
+    password_hint: admin.password,
+    name: admin.name,
+  }
+}
+
+function fromClubAdminRow(row) {
+  return {
+    id: row.id,
+    toastmasterId: row.toastmaster_id || '',
+    username: row.username || '',
+    password: row.password_hint || '',
+    name: row.name || '',
   }
 }
