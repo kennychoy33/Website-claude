@@ -143,11 +143,14 @@ export const seedPeopleState = {
 export const seedMeetingOpsState = {
   attendance: [],
   roles: [
-    { id: 'r1', roleName: 'Toastmaster of the Evening', personType: 'member', personId: '' },
-    { id: 'r2', roleName: 'Timer', personType: 'member', personId: '' },
-    { id: 'r3', roleName: 'Ah Counter', personType: 'member', personId: '' },
-    { id: 'r4', roleName: 'Grammarian', personType: 'member', personId: '' },
-    { id: 'r5', roleName: 'General Evaluator', personType: 'member', personId: '' },
+    { id: 'r1', roleName: 'Sergeant at Arms', time: '3', personType: 'member', personId: '' },
+    { id: 'r2', roleName: 'President Opening', time: '5', personType: 'member', personId: '' },
+    { id: 'r3', roleName: 'Toastmaster of the Evening', time: '5', personType: 'member', personId: '' },
+    { id: 'r4', roleName: 'Timer', time: '3', personType: 'member', personId: '' },
+    { id: 'r5', roleName: 'Ah Counter', time: '3', personType: 'member', personId: '' },
+    { id: 'r6', roleName: 'Grammarian', time: '5', personType: 'member', personId: '' },
+    { id: 'r7', roleName: 'Table Topics Master', time: '20', personType: 'member', personId: '' },
+    { id: 'r8', roleName: 'General Evaluator', time: '10', personType: 'member', personId: '' },
   ],
 }
 
@@ -161,18 +164,18 @@ export const seedSystemSettings = {
   agendaTemplateName: '',
   agendaTemplateDataUrl: '',
   agendaRoleTemplate: [
-    'Sergeant at Arms',
-    'President Opening',
-    'Toastmaster of the Evening',
-    'Timer',
-    'Ah Counter',
-    'Grammarian',
-    'Prepared Speaker 1',
-    'Prepared Speaker 2',
-    'Evaluator 1',
-    'Evaluator 2',
-    'Table Topics Master',
-    'General Evaluator',
+    { roleName: 'Sergeant at Arms', time: '3' },
+    { roleName: 'President Opening', time: '5' },
+    { roleName: 'Toastmaster of the Evening', time: '5' },
+    { roleName: 'Timer', time: '3' },
+    { roleName: 'Ah Counter', time: '3' },
+    { roleName: 'Grammarian', time: '5' },
+    { roleName: 'Prepared Speaker 1', time: '7' },
+    { roleName: 'Prepared Speaker 2', time: '7' },
+    { roleName: 'Evaluator 1', time: '3' },
+    { roleName: 'Evaluator 2', time: '3' },
+    { roleName: 'Table Topics Master', time: '20' },
+    { roleName: 'General Evaluator', time: '10' },
   ],
   clubAdmins: [
     { id: 'a1', toastmasterId: '', username: '', password: '', name: '' },
@@ -245,7 +248,7 @@ export async function loadSystemSettings(spaceId = '') {
 
   const { data, error } = await supabase
     .from('tm_club_settings')
-    .select('owner_id, club_name, club_short, toastmaster_id, admin_name, username, logo_data_url, agenda_template_name, agenda_template_data_url')
+    .select('owner_id, club_name, club_short, toastmaster_id, admin_name, username, logo_data_url, agenda_template_name, agenda_template_data_url, agenda_role_template')
     .eq('owner_id', ownerId)
     .maybeSingle()
 
@@ -766,6 +769,7 @@ function toRoleRow(item, ownerId, meetingId) {
     owner_id: ownerId,
     meeting_id: meetingId,
     role_name: item.roleName,
+    role_time: item.time,
     person_type: item.personType,
     person_id: item.personId,
   }
@@ -775,6 +779,7 @@ function fromRoleRow(row) {
   return {
     id: row.id,
     roleName: row.role_name,
+    time: row.role_time || '',
     personType: row.person_type,
     personId: row.person_id,
   }

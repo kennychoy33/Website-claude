@@ -118,6 +118,7 @@ create table if not exists public.tm_meeting_roles (
   owner_id uuid not null references auth.users(id) on delete cascade,
   meeting_id text not null references public.tm_meetings(id) on delete cascade,
   role_name text not null,
+  role_time text,
   person_type text not null check (person_type in ('member', 'guest')),
   person_id text not null,
   created_at timestamptz not null default now()
@@ -136,6 +137,9 @@ alter table public.tm_club_settings
   add column if not exists agenda_role_template jsonb not null default '[]'::jsonb;
 
 create index if not exists tm_club_admins_owner_idx on public.tm_club_admins(owner_id);
+
+alter table public.tm_meeting_roles
+  add column if not exists role_time text;
 
 alter table public.tm_meetings
   add column if not exists owner_id uuid references auth.users(id) on delete cascade;

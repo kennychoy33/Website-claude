@@ -136,6 +136,7 @@ const LANG = {
     attended: '出席',
     absent: '缺席',
     role: '职务',
+    roleTime: '时间/分钟',
     assignee: '担任者',
     addRole: '+ 添加职务',
     member: '会员',
@@ -162,6 +163,8 @@ const LANG = {
     masterTitle: '系统管理',
     masterSubtitle: '最高管理者用于新建分会、分配 Toastmaster ID、User Name 和初始 Password。',
     createClub: '新建分会',
+    clubCreated: '分会已加入',
+    createClubHint: '请填写分会名称、User Name 和 Password',
     clubList: '分会列表',
     newMeeting: '新建例会',
     importAgenda: '导入例会表 / Excel',
@@ -280,6 +283,7 @@ const LANG = {
     attended: 'Attended',
     absent: 'Absent',
     role: 'Role',
+    roleTime: 'Time / min',
     assignee: 'Assignee',
     addRole: '+ Add Role',
     member: 'Member',
@@ -306,6 +310,8 @@ const LANG = {
     masterTitle: 'System Admin',
     masterSubtitle: 'Owner-only area to create clubs, Toastmaster IDs, user names, and initial passwords.',
     createClub: 'Create Club',
+    clubCreated: 'Club added',
+    createClubHint: 'Please enter club name, user name, and password',
     clubList: 'Club List',
     newMeeting: 'New Meeting',
     importAgenda: 'Import Agenda / Excel',
@@ -617,14 +623,22 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
 
   function updateTemplateRole(index, value) {
     const nextRoles = [...(settings.agendaRoleTemplate || [])]
-    nextRoles[index] = value
+    const current = typeof nextRoles[index] === 'string' ? { roleName: nextRoles[index], time: '' } : nextRoles[index]
+    nextRoles[index] = { ...current, roleName: value }
+    setSettings({ ...settings, agendaRoleTemplate: nextRoles })
+  }
+
+  function updateTemplateRoleTime(index, value) {
+    const nextRoles = [...(settings.agendaRoleTemplate || [])]
+    const current = typeof nextRoles[index] === 'string' ? { roleName: nextRoles[index], time: '' } : nextRoles[index]
+    nextRoles[index] = { ...current, time: value }
     setSettings({ ...settings, agendaRoleTemplate: nextRoles })
   }
 
   function addTemplateRole() {
     setSettings({
       ...settings,
-      agendaRoleTemplate: [...(settings.agendaRoleTemplate || []), ''],
+      agendaRoleTemplate: [...(settings.agendaRoleTemplate || []), { roleName: '', time: '' }],
     })
   }
 
@@ -721,13 +735,17 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
           <h2>{t.agendaRoleTemplate}</h2>
         </div>
         <div className="tm-template-roles">
-          {(settings.agendaRoleTemplate || []).map((role, index) => (
-            <div key={`${role}-${index}`} className="tm-template-role-row">
+          {(settings.agendaRoleTemplate || []).map((role, index) => {
+            const templateRole = typeof role === 'string' ? { roleName: role, time: '' } : role
+            return (
+            <div key={`${templateRole.roleName}-${index}`} className="tm-template-role-row">
               <span>{index + 1}</span>
-              <input value={role} onChange={event => updateTemplateRole(index, event.target.value)} />
+              <input value={templateRole.roleName} onChange={event => updateTemplateRole(index, event.target.value)} />
+              <input value={templateRole.time || ''} onChange={event => updateTemplateRoleTime(index, event.target.value)} placeholder="min" />
               <button className="tm-danger" onClick={() => removeTemplateRole(index)}>{t.remove}</button>
             </div>
-          ))}
+            )
+          })}
         </div>
         <button className="tm-outline" onClick={addTemplateRole}>{t.addTemplateRole}</button>
       </section>
@@ -768,7 +786,13 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
 
 function MasterAdminView({ settings, t }) {
   const admins = settings.clubAdmins || []
-  const [clubs, setClubs] = useState([])
+  const [clubs, setClubs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('tm-master-clubs') || '[]')
+    } catch {
+      return []
+    }
+  })
   const [draft, setDraft] = useState({
     clubName: '',
     toastmasterId: '',
@@ -776,18 +800,26 @@ function MasterAdminView({ settings, t }) {
     password: '',
     adminName: '',
   })
+  const [message, setMessage] = useState('')
 
   function updateDraft(field, value) {
     setDraft({ ...draft, [field]: value })
   }
 
   function createClub() {
-    if (!draft.clubName || !draft.username || !draft.password) return
-    setClubs([
+    if (!draft.clubName || !draft.username || !draft.password) {
+      setMessage(t.createClubHint)
+      document.getElementById('tm-create-club-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return
+    }
+    const nextClubs = [
       ...clubs,
       { ...draft, id: `club${Date.now()}` },
-    ])
+    ]
+    setClubs(nextClubs)
+    localStorage.setItem('tm-master-clubs', JSON.stringify(nextClubs))
     setDraft({ clubName: '', toastmasterId: '', username: '', password: '', adminName: '' })
+    setMessage(t.clubCreated)
   }
 
   return (
@@ -801,7 +833,8 @@ function MasterAdminView({ settings, t }) {
           <button className="tm-gold" onClick={createClub}>{t.createClub}</button>
         </div>
       </div>
-      <section className="tm-panel">
+      {message && <div className="tm-sync-badge"><b>{message}</b></div>}
+      <section className="tm-panel" id="tm-create-club-form">
         <div className="tm-panel-title">
           <span className="tm-icon">＋</span>
           <h2>{t.createClub}</h2>
@@ -1229,6 +1262,10 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
     ...people.guests.map(item => ({ personType: 'guest', personId: item.id, name: item.name })),
   ].filter(item => item.name)
 
+  function updateMeeting(field, value) {
+    setData({ ...data, meeting: { ...data.meeting, [field]: value } })
+  }
+
   function updateAttendance(personType, personId, attended) {
     const key = `${personType}:${personId}`
     const existing = meetingOps.attendance.find(item => `${item.personType}:${item.personId}` === key)
@@ -1255,7 +1292,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
   function addRole() {
     setMeetingOps({
       ...meetingOps,
-      roles: [...meetingOps.roles, { id: `r${Date.now()}`, roleName: '', personType: 'member', personId: '' }],
+      roles: [...meetingOps.roles, { id: `r${Date.now()}`, roleName: '', time: '', personType: 'member', personId: '' }],
     })
   }
 
@@ -1266,23 +1303,32 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
   function createMeeting() {
     const templateRoles = (settings.agendaRoleTemplate || []).filter(Boolean)
     const roles = (templateRoles.length ? templateRoles : [
-      'Toastmaster of the Evening',
-      'Timer',
-      'Ah Counter',
-      'Grammarian',
-      'General Evaluator',
-    ]).map((roleName, index) => ({
+      { roleName: 'Sergeant at Arms', time: '3' },
+      { roleName: 'President Opening', time: '5' },
+      { roleName: 'Toastmaster of the Evening', time: '5' },
+      { roleName: 'Timer', time: '3' },
+      { roleName: 'Ah Counter', time: '3' },
+      { roleName: 'Grammarian', time: '5' },
+      { roleName: 'Table Topics Master', time: '20' },
+      { roleName: 'General Evaluator', time: '10' },
+    ]).map((role, index) => {
+      const templateRole = typeof role === 'string' ? { roleName: role, time: '' } : role
+      return ({
       id: `r${Date.now()}${index}`,
-      roleName,
+      roleName: templateRole.roleName,
+      time: templateRole.time || '',
       personType: 'member',
       personId: '',
-    }))
+    })
+    })
+    const currentNumber = String(data.meeting.number || '').match(/\d+/)?.[0]
+    const nextNumber = currentNumber ? `第${Number(currentNumber) + 1}次` : ''
     const next = {
       ...data,
       meeting: {
         ...data.meeting,
         id: `${Date.now()}`,
-        number: '',
+        number: nextNumber,
         date: new Date().toISOString().slice(0, 10),
         theme: '',
         word: '',
@@ -1324,6 +1370,11 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
     URL.revokeObjectURL(url)
   }
 
+  async function saveMeetingAll() {
+    await persistState(data)
+    await persistMeetingOps(meetingOps)
+  }
+
   return (
     <div className="tm-main-column">
       <div className="tm-screen-head no-print">
@@ -1339,12 +1390,32 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
             <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv" onChange={importAgendaFile} />
           </label>
           <button onClick={exportExcel}>{t.exportExcel}</button>
-          <button onClick={() => persistMeetingOps(meetingOps)}>{t.save}</button>
-          <button onClick={() => persistState(data)}>{t.save}</button>
+          <button onClick={saveMeetingAll}>{t.save}</button>
           <button onClick={addRole}>{t.addRole}</button>
           <button onClick={() => window.print()}>{t.printAgenda}</button>
         </div>
       </div>
+
+      <section className="tm-panel no-print">
+        <div className="tm-panel-title">
+          <span className="tm-icon">☰</span>
+          <h2>{t.meetingInfo}</h2>
+        </div>
+        <div className="tm-form-grid">
+          {[
+            ['number', t.meetingNo],
+            ['date', t.date],
+            ['theme', t.theme],
+            ['word', t.word],
+            ['closeTime', t.closeTime],
+          ].map(([field, label]) => (
+            <label key={field}>
+              <span>{label}</span>
+              <input value={data.meeting[field] || ''} onChange={event => updateMeeting(field, event.target.value)} />
+            </label>
+          ))}
+        </div>
+      </section>
 
       <section className="tm-panel no-print">
         <div className="tm-panel-title">
@@ -1377,12 +1448,14 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
         <div className="tm-role-table">
           <div className="tm-role-head">
             <span>{t.role}</span>
+            <span>{t.roleTime}</span>
             <span>{t.assignee}</span>
             <span>{t.action}</span>
           </div>
           {meetingOps.roles.map(item => (
             <div className="tm-role-row" key={item.id}>
               <input value={item.roleName} onChange={event => updateRole(item.id, 'roleName', event.target.value)} />
+              <input value={item.time || ''} onChange={event => updateRole(item.id, 'time', event.target.value)} />
               <PersonSelect
                 people={people}
                 personType={item.personType}
@@ -1407,7 +1480,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
           <div>
             <h3>{t.rolesTitle}</h3>
             {meetingOps.roles.map(item => (
-              <p key={item.id}><b>{item.roleName || t.role}</b>: {personLabel(people, item.personType, item.personId) || t.pending}</p>
+              <p key={item.id}><b>{item.roleName || t.role}</b>{item.time ? ` (${item.time})` : ''}: {personLabel(people, item.personType, item.personId) || t.pending}</p>
             ))}
           </div>
           <div>
