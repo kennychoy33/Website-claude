@@ -1304,16 +1304,14 @@ function PersonSelect({ people, personType, personId, onChange, t, disabled = fa
 }
 
 function fullToastmastersRoles(settings) {
+  const nonRolePattern = /invocation|pledge|guest introduction|word of the day|timer report|ah counter report|grammarian report|awards presentation|president closing/i
   const fallbackRoles = [
     { roleName: 'Sergeant at Arms', time: '3' },
-    { roleName: 'President Opening', time: '5' },
-    { roleName: 'Invocation / Pledge', time: '2' },
-    { roleName: 'Guest Introduction', time: '5' },
+    { roleName: 'President', time: '5' },
     { roleName: 'Toastmaster of the Evening', time: '5' },
     { roleName: 'Timer', time: '3' },
     { roleName: 'Ah Counter', time: '3' },
     { roleName: 'Grammarian', time: '5' },
-    { roleName: 'Word of the Day', time: '2' },
     { roleName: 'Prepared Speaker 1', time: '7' },
     { roleName: 'Prepared Speaker 2', time: '7' },
     { roleName: 'Prepared Speaker 3', time: '7' },
@@ -1325,14 +1323,11 @@ function fullToastmastersRoles(settings) {
     { roleName: 'Table Topics Speaker 2', time: '2' },
     { roleName: 'Table Topics Speaker 3', time: '2' },
     { roleName: 'Table Topics Speaker 4', time: '2' },
-    { roleName: 'Timer Report', time: '2' },
-    { roleName: 'Ah Counter Report', time: '2' },
-    { roleName: 'Grammarian Report', time: '3' },
     { roleName: 'General Evaluator', time: '10' },
-    { roleName: 'Awards Presentation', time: '5' },
-    { roleName: 'President Closing', time: '5' },
   ]
-  const templateRoles = (settings.agendaRoleTemplate || []).filter(Boolean)
+  const templateRoles = (settings.agendaRoleTemplate || [])
+    .filter(Boolean)
+    .filter(role => !nonRolePattern.test(typeof role === 'string' ? role : role.roleName || ''))
   const sourceRoles = templateRoles.length >= 8 ? templateRoles : fallbackRoles
   return sourceRoles.map((role, index) => {
     const templateRole = typeof role === 'string' ? { roleName: role, time: '' } : role
@@ -1344,6 +1339,35 @@ function fullToastmastersRoles(settings) {
       personId: '',
     }
   })
+}
+
+function candidatesFromMeetingRoles(roles, people, existingData) {
+  const toName = role => personLabel(people, role.personType, role.personId)
+  const toCandidate = (role, prefix, index) => ({
+    id: `${prefix}${Date.now()}${index}`,
+    name: toName(role),
+    votes: 0,
+  })
+  const prepared = roles
+    .filter(role => /prepared speaker/i.test(role.roleName) && toName(role))
+    .map((role, index) => ({
+      ...toCandidate(role, 'p', index),
+      title: '',
+      project: '',
+    }))
+  const impromptu = roles
+    .filter(role => /table topics speaker/i.test(role.roleName) && toName(role))
+    .map((role, index) => toCandidate(role, 'i', index))
+  const evaluator = roles
+    .filter(role => /^evaluator\b/i.test(role.roleName) && toName(role))
+    .map((role, index) => toCandidate(role, 'e', index))
+
+  return {
+    ...existingData,
+    prepared,
+    impromptu,
+    evaluator,
+  }
 }
 
 function meetingRecordKey() {
@@ -1421,7 +1445,9 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
 
   function resetRolesFromTemplate() {
     if (locked) return
-    setMeetingOps({ ...meetingOps, roles: fullToastmastersRoles(settings) })
+    const roles = fullToastmastersRoles(settings)
+    setMeetingOps({ ...meetingOps, roles })
+    setData(candidatesFromMeetingRoles(roles, people, data))
   }
 
   function createMeeting() {
@@ -1478,12 +1504,14 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
 
   async function saveMeetingAll() {
     if (locked) return
-    await persistState(data)
+    const syncedData = candidatesFromMeetingRoles(meetingOps.roles, people, data)
+    setData(syncedData)
+    await persistState(syncedData)
     await persistMeetingOps(meetingOps)
     const record = {
-      id: data.meeting.id || `${Date.now()}`,
+      id: syncedData.meeting.id || `${Date.now()}`,
       savedAt: new Date().toISOString(),
-      data,
+      data: syncedData,
       meetingOps,
     }
     const nextRecords = [
