@@ -773,20 +773,7 @@ export async function saveVoteState(state) {
     ...state.evaluator.map((item, index) => toCandidateRow(item, meetingId, 'evaluator', index)),
   ]
 
-  const { error: meetingError } = await supabase
-    .from('tm_meetings')
-    .upsert(meetingRow)
-
-  if (isMissingColumnError(meetingError, 'close_time')) {
-    const { close_time: _closeTime, ...compatibleMeetingRow } = meetingRow
-    const { error: compatibleMeetingError } = await supabase
-      .from('tm_meetings')
-      .upsert(compatibleMeetingRow)
-
-    if (compatibleMeetingError) throw compatibleMeetingError
-  } else if (meetingError) {
-    throw meetingError
-  }
+  await upsertMeetingWithSchemaFallback(meetingRow)
 
   const { error: deleteError } = await supabase
     .from('tm_candidates')
@@ -875,6 +862,25 @@ function toMeetingRow(meeting, meetingId, ownerId) {
     close_time: meeting.closeTime,
     status: meeting.status,
     public_link: meeting.link,
+  }
+}
+
+async function upsertMeetingWithSchemaFallback(meetingRow) {
+  const optionalColumns = ['owner_id', 'word_of_day', 'close_time', 'status', 'public_link', 'created_at', 'updated_at']
+  let row = { ...meetingRow }
+
+  for (let attempt = 0; attempt <= optionalColumns.length; attempt += 1) {
+    const { error } = await supabase
+      .from('tm_meetings')
+      .upsert(row)
+
+    if (!error) return
+
+    const missingColumn = optionalColumns.find(column => isMissingColumnError(error, column) && column in row)
+    if (!missingColumn) throw error
+
+    const { [missingColumn]: _removed, ...nextRow } = row
+    row = nextRow
   }
 }
 

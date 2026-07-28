@@ -1,3 +1,12 @@
+alter table public.tm_meetings
+  add column if not exists owner_id uuid references auth.users(id) on delete cascade,
+  add column if not exists word_of_day text,
+  add column if not exists close_time text,
+  add column if not exists status text not null default 'draft',
+  add column if not exists public_link text,
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
+
 create table if not exists public.tm_members (
   id text primary key,
   owner_id uuid not null references auth.users(id) on delete cascade,
@@ -24,10 +33,6 @@ create table if not exists public.tm_guests (
   notes text,
   created_at timestamptz not null default now()
 );
-
-alter table public.tm_meetings
-  add column if not exists owner_id uuid references auth.users(id) on delete cascade,
-  add column if not exists close_time text;
 
 create index if not exists tm_members_owner_idx on public.tm_members(owner_id);
 create index if not exists tm_guests_owner_idx on public.tm_guests(owner_id);
