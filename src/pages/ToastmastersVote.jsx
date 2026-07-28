@@ -2201,7 +2201,6 @@ export default function ToastmastersVote() {
   }
 
   const nav = useMemo(() => [
-    ['system', t.navSystem],
     ['meeting', t.navMeeting],
     ['people', t.navPeople],
     ['admin', t.navAdmin],
@@ -2211,7 +2210,8 @@ export default function ToastmastersVote() {
     ['history', t.navHistory],
   ], [t])
 
-  const masterNav = useMemo(() => [
+  const bottomNav = useMemo(() => [
+    ['system', t.navSystem],
     ['master', t.navMaster],
   ], [t])
   const superAdmin = isSuperAdmin(user)
@@ -2276,7 +2276,9 @@ export default function ToastmastersVote() {
           <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
         ))}
         <div className="tm-sidebar-bottom">
-          {superAdmin && masterNav.map(([key, label]) => (
+          {bottomNav
+            .filter(([key]) => key !== 'master' || superAdmin)
+            .map(([key, label]) => (
             <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
           ))}
         </div>
