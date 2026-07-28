@@ -31,22 +31,44 @@ const envCloudConfig = {
   anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY,
 }
 
+function normalizeSupabaseUrl(value = '') {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  try {
+    const url = new URL(raw.startsWith('http') ? raw : `https://${raw}`)
+    return `${url.protocol}//${url.host}`
+  } catch {
+    return raw
+      .replace(/\/rest\/v1\/?$/i, '')
+      .replace(/\/auth\/v1\/?$/i, '')
+      .replace(/\/+$/g, '')
+  }
+}
+
+function normalizeCloudConfig(config = {}) {
+  return {
+    url: normalizeSupabaseUrl(config.url),
+    anonKey: String(config.anonKey || '').trim(),
+  }
+}
+
 function decodeCloudConfig(value = '') {
   try {
     const base64 = value.replace(/-/g, '+').replace(/_/g, '/')
     const json = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='))
     const parsed = JSON.parse(json)
-    return {
+    return normalizeCloudConfig({
       url: parsed.url || '',
       anonKey: parsed.anonKey || '',
-    }
+    })
   } catch {
     return { url: '', anonKey: '' }
   }
 }
 
 function encodeCloudConfig(config) {
-  const json = JSON.stringify({ url: config.url || '', anonKey: config.anonKey || '' })
+  const normalized = normalizeCloudConfig(config)
+  const json = JSON.stringify({ url: normalized.url || '', anonKey: normalized.anonKey || '' })
   return btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
@@ -58,20 +80,17 @@ function getUrlCloudConfig() {
 export function loadRuntimeCloudConfig() {
   try {
     const saved = JSON.parse(localStorage.getItem(TM_CLOUD_CONFIG_STORAGE_KEY) || '{}')
-    return {
+    return normalizeCloudConfig({
       url: saved.url || '',
       anonKey: saved.anonKey || '',
-    }
+    })
   } catch {
     return { url: '', anonKey: '' }
   }
 }
 
 export function saveRuntimeCloudConfig(config) {
-  localStorage.setItem(TM_CLOUD_CONFIG_STORAGE_KEY, JSON.stringify({
-    url: config.url || '',
-    anonKey: config.anonKey || '',
-  }))
+  localStorage.setItem(TM_CLOUD_CONFIG_STORAGE_KEY, JSON.stringify(normalizeCloudConfig(config)))
 }
 
 export function clearRuntimeCloudConfig() {
@@ -83,7 +102,7 @@ function getActiveCloudConfig() {
   if (urlConfig.url && urlConfig.anonKey) return urlConfig
   const runtimeConfig = loadRuntimeCloudConfig()
   if (runtimeConfig.url && runtimeConfig.anonKey) return runtimeConfig
-  return envCloudConfig
+  return normalizeCloudConfig(envCloudConfig)
 }
 
 const activeCloudConfig = getActiveCloudConfig()
