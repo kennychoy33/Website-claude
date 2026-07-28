@@ -5,6 +5,8 @@ export const TM_VOTE_MEETING_ID = '627'
 const TM_WORKSPACE_STORAGE_KEY = `${TM_VOTE_STORAGE_KEY}-workspace-id`
 const TM_CLOUD_CONFIG_STORAGE_KEY = `${TM_VOTE_STORAGE_KEY}-cloud-config`
 const TM_ACTIVE_CLUB_STORAGE_KEY = `${TM_VOTE_STORAGE_KEY}-active-club`
+const DEFAULT_SUPABASE_URL = 'https://tjojeuqvbmejnnauibkg.supabase.co'
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_Js5Iky2j-g31KZsCjeb30g_LIdWOKP8'
 let activeClubId = localStorage.getItem(TM_ACTIVE_CLUB_STORAGE_KEY) || 'default'
 
 export function setActiveClubId(clubId = 'default') {
@@ -25,8 +27,8 @@ function getClubStorageItem(key) {
 }
 
 const envCloudConfig = {
-  url: import.meta.env.VITE_SUPABASE_URL || '',
-  anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+  url: import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL,
+  anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY,
 }
 
 function decodeCloudConfig(value = '') {
