@@ -2092,7 +2092,10 @@ export default function ToastmastersVote() {
       try {
         setActiveClubId(selectedClubId)
         const result = await loadPeopleState()
-        if (!ignore) setPeople(result.data)
+        if (!ignore) {
+          setPeople(result.data)
+          if (result.warning) setSyncStatus(result.warning)
+        }
       } catch {
         if (!ignore) setPeople({ members: [], guests: [] })
       }
@@ -2165,8 +2168,8 @@ export default function ToastmastersVote() {
   async function persistPeople(next) {
     setSyncStatus(t.syncing)
     try {
-      await savePeopleState(next)
-      setSyncStatus(t.peopleSaved)
+      const result = await savePeopleState(next)
+      setSyncStatus(result.warning || t.peopleSaved)
     } catch (err) {
       setSyncStatus(err.message || t.saveFailed)
       throw err

@@ -480,6 +480,14 @@ export async function loadPeopleState() {
       .order('visit_date', { ascending: false }),
   ])
 
+  if (isMissingSchemaError(memberError) || isMissingSchemaError(guestError)) {
+    return {
+      data: loadLocalPeople(),
+      source: 'local',
+      warning: '云端数据库还没建立会员/嘉宾表，当前先使用本机暂存。请在 Supabase 执行 supabase/tm-vote-cloud-fix.sql。',
+    }
+  }
+
   if (memberError) throw memberError
   if (guestError) throw guestError
 
@@ -525,6 +533,13 @@ export async function savePeopleState(state) {
     .eq('owner_id', user.id)
     .like('id', `${scopedPrefix}%`)
 
+  if (isMissingSchemaError(memberDeleteError)) {
+    saveLocalPeople(state)
+    return {
+      source: 'local',
+      warning: '云端数据库还没建立会员/嘉宾表，已先保存到本机。请在 Supabase 执行 supabase/tm-vote-cloud-fix.sql。',
+    }
+  }
   if (memberDeleteError) throw memberDeleteError
 
   if (memberRows.length) {
@@ -532,6 +547,13 @@ export async function savePeopleState(state) {
       .from('tm_members')
       .insert(memberRows)
 
+    if (isMissingSchemaError(memberInsertError)) {
+      saveLocalPeople(state)
+      return {
+        source: 'local',
+        warning: '云端数据库还没建立会员/嘉宾表，已先保存到本机。请在 Supabase 执行 supabase/tm-vote-cloud-fix.sql。',
+      }
+    }
     if (memberInsertError) throw memberInsertError
   }
 
@@ -541,6 +563,13 @@ export async function savePeopleState(state) {
     .eq('owner_id', user.id)
     .like('id', `${scopedPrefix}%`)
 
+  if (isMissingSchemaError(guestDeleteError)) {
+    saveLocalPeople(state)
+    return {
+      source: 'local',
+      warning: '云端数据库还没建立会员/嘉宾表，已先保存到本机。请在 Supabase 执行 supabase/tm-vote-cloud-fix.sql。',
+    }
+  }
   if (guestDeleteError) throw guestDeleteError
 
   if (guestRows.length) {
@@ -548,6 +577,13 @@ export async function savePeopleState(state) {
       .from('tm_guests')
       .insert(guestRows)
 
+    if (isMissingSchemaError(guestInsertError)) {
+      saveLocalPeople(state)
+      return {
+        source: 'local',
+        warning: '云端数据库还没建立会员/嘉宾表，已先保存到本机。请在 Supabase 执行 supabase/tm-vote-cloud-fix.sql。',
+      }
+    }
     if (guestInsertError) throw guestInsertError
   }
 
@@ -741,7 +777,16 @@ export async function saveVoteState(state) {
     .from('tm_meetings')
     .upsert(meetingRow)
 
-  if (meetingError) throw meetingError
+  if (isMissingColumnError(meetingError, 'close_time')) {
+    const { close_time: _closeTime, ...compatibleMeetingRow } = meetingRow
+    const { error: compatibleMeetingError } = await supabase
+      .from('tm_meetings')
+      .upsert(compatibleMeetingRow)
+
+    if (compatibleMeetingError) throw compatibleMeetingError
+  } else if (meetingError) {
+    throw meetingError
+  }
 
   const { error: deleteError } = await supabase
     .from('tm_candidates')
@@ -881,6 +926,18 @@ function fromHistoryRow(row) {
     evaluatorWinner: row.evaluator_winner,
     evaluatorVotes: row.evaluator_votes,
   }
+}
+
+function isMissingSchemaError(error) {
+  if (!error) return false
+  const message = `${error.message || error.details || ''}`.toLowerCase()
+  return message.includes('schema cache') || message.includes('could not find the table') || message.includes('could not find the')
+}
+
+function isMissingColumnError(error, columnName) {
+  if (!error) return false
+  const message = `${error.message || error.details || ''}`.toLowerCase()
+  return message.includes(`${columnName}`.toLowerCase()) && message.includes('schema cache')
 }
 
 function getPeopleCloudIdPrefix(ownerId) {
