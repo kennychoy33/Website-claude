@@ -2151,6 +2151,7 @@ export default function ToastmastersVote() {
     setSyncStatus(t.syncing)
     try {
       const result = await saveVoteState(next)
+      if (result.data) setData(normalizeState(result.data))
       setSource(result.source)
       setSyncStatus(t.saved)
     } catch {

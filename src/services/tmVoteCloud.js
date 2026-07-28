@@ -649,7 +649,26 @@ export async function loadVoteState(spaceId = '', clubId = getActiveClubId()) {
   if (meetingError) throw meetingError
 
   if (!meeting) {
-    if (!user || spaceId) return { data: loadLocalState(), source: 'local' }
+    if (spaceId) {
+      return {
+        data: {
+          ...seedState,
+          meeting: {
+            ...seedState.meeting,
+            id: meetingId,
+            number: '',
+            theme: '',
+            status: 'draft',
+            link: getPublicVoteUrl(activeSpace, clubId),
+          },
+          prepared: [],
+          impromptu: [],
+          evaluator: [],
+        },
+        source: 'cloud',
+      }
+    }
+    if (!user) return { data: loadLocalState(), source: 'local' }
     await saveVoteState(seedState)
     return loadVoteState(user.id)
   }
@@ -672,7 +691,7 @@ export async function loadVoteState(spaceId = '', clubId = getActiveClubId()) {
 
   return {
     data: {
-      meeting: { ...fromMeetingRow(meeting), link: meeting.public_link || getPublicVoteUrl(activeSpace) },
+      meeting: { ...fromMeetingRow(meeting), link: meeting.public_link || getPublicVoteUrl(activeSpace, clubId) },
       prepared: candidates.filter(item => item.category === 'prepared').map(fromCandidateRow),
       impromptu: candidates.filter(item => item.category === 'impromptu').map(fromCandidateRow),
       evaluator: candidates.filter(item => item.category === 'evaluator').map(fromCandidateRow),
@@ -685,13 +704,13 @@ export async function loadVoteState(spaceId = '', clubId = getActiveClubId()) {
 export async function saveVoteState(state) {
   if (!isCloudConfigured) {
     saveLocalState(state)
-    return { source: 'local' }
+    return { data: loadLocalState(), source: 'local' }
   }
 
   const user = await getCurrentUser()
   if (!user) {
     saveLocalState(state)
-    return { source: 'local' }
+    return { data: loadLocalState(), source: 'local' }
   }
 
   rememberWorkspaceId(user.id)
@@ -723,7 +742,13 @@ export async function saveVoteState(state) {
 
   if (candidateError) throw candidateError
 
-  return { source: 'cloud' }
+  return {
+    data: {
+      ...state,
+      meeting,
+    },
+    source: 'cloud',
+  }
 }
 
 export async function submitVote(state, preparedId, impromptuId, evaluatorId, voterToken) {
