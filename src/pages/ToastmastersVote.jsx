@@ -55,6 +55,12 @@ function getSettingsUrl() {
   return new URL(`${basePath.replace(/\/$/, '')}/tm-vote`, window.location.origin).toString()
 }
 
+const SUPER_ADMIN_EMAILS = ['kenny@smartouch.com.my']
+
+function isSuperAdmin(user) {
+  return SUPER_ADMIN_EMAILS.includes(String(user?.email || '').toLowerCase())
+}
+
 const LANG = {
   zh: {
     navAdmin: '投票设置',
@@ -157,6 +163,7 @@ const LANG = {
     logout: '登出',
     loginTitle: 'Toastmasters 投票系统',
     loginSubtitle: '登录你的独立空间，管理自己的会议、候选人和历史票数。',
+    superAdminHint: '系统最高管理员 Email: kenny@smartouch.com.my。请用这个 Email 建立账号或登录。',
     membersTitle: '会员资料库',
     guestsTitle: '嘉宾资料库',
     addMember: '+ 添加会员',
@@ -333,6 +340,7 @@ const LANG = {
     logout: 'Logout',
     loginTitle: 'Toastmasters Voting System',
     loginSubtitle: 'Sign in to manage your own meetings, candidates, and voting history.',
+    superAdminHint: 'System Super Admin Email: kenny@smartouch.com.my. Create an account or log in with this email.',
     membersTitle: 'Member Directory',
     guestsTitle: 'Guest Directory',
     addMember: '+ Add Member',
@@ -1954,6 +1962,7 @@ function LoginView({ lang, setLang, t, onLogin }) {
         <h1>{t.loginTitle}</h1>
         <p>{t.loginSubtitle}</p>
         <p className="tm-login-note">{t.privateSpace}</p>
+        <p className="tm-login-note">{t.superAdminHint}</p>
         <label>
           <span>{t.email}</span>
           <input value={email} onChange={e => setEmail(e.target.value)} type="email" />
@@ -2199,6 +2208,7 @@ export default function ToastmastersVote() {
   const masterNav = useMemo(() => [
     ['master', t.navMaster],
   ], [t])
+  const superAdmin = isSuperAdmin(user)
 
   if (!authReady) {
     return <div className="tm-success-card"><h2>{appText.syncing}</h2></div>
@@ -2260,14 +2270,14 @@ export default function ToastmastersVote() {
           <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
         ))}
         <div className="tm-sidebar-bottom">
-          {masterNav.map(([key, label]) => (
+          {superAdmin && masterNav.map(([key, label]) => (
             <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
           ))}
         </div>
       </aside>}
       <main className="tm-content">
         {view === 'system' && <SystemSettingsView settings={settings} setSettings={setSettings} persistSettings={persistSettings} syncStatus={syncStatus} t={appText} />}
-        {view === 'master' && <MasterAdminView settings={settings} t={appText} onClubsChange={setManagedClubs} />}
+        {view === 'master' && superAdmin && <MasterAdminView settings={settings} t={appText} onClubsChange={setManagedClubs} />}
         {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} meetingOps={meetingOps} spaceId={workspaceId} voteLink={effectiveVoteLink} />}
         {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={appText} />}
         {view === 'meeting' && <MeetingView data={data} setData={setData} persistState={persistState} people={people} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={appText} settings={settings} />}
