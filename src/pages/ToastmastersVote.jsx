@@ -2167,8 +2167,9 @@ export default function ToastmastersVote() {
     try {
       await savePeopleState(next)
       setSyncStatus(t.peopleSaved)
-    } catch {
-      setSyncStatus(t.saveFailed)
+    } catch (err) {
+      setSyncStatus(err.message || t.saveFailed)
+      throw err
     }
   }
 

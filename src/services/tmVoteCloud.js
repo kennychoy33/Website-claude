@@ -483,10 +483,21 @@ export async function loadPeopleState() {
   if (memberError) throw memberError
   if (guestError) throw guestError
 
+  const scopedPrefix = getPeopleCloudIdPrefix(user.id)
+  const isCurrentClubRow = row => {
+    if (typeof row.id !== 'string' || !row.id.includes('::')) return true
+    return row.id.startsWith(scopedPrefix)
+  }
+
+  const scopedMembers = members.filter(isCurrentClubRow).filter(row => `${row.id}`.startsWith(scopedPrefix))
+  const scopedGuests = guests.filter(isCurrentClubRow).filter(row => `${row.id}`.startsWith(scopedPrefix))
+  const visibleMembers = scopedMembers.length ? scopedMembers : members.filter(isCurrentClubRow)
+  const visibleGuests = scopedGuests.length ? scopedGuests : guests.filter(isCurrentClubRow)
+
   return {
     data: {
-      members: members.map(fromMemberRow),
-      guests: guests.map(fromGuestRow),
+      members: visibleMembers.map(fromMemberRow),
+      guests: visibleGuests.map(fromGuestRow),
     },
     source: 'cloud',
   }
@@ -504,13 +515,15 @@ export async function savePeopleState(state) {
     return { source: 'local' }
   }
 
-  const memberRows = state.members.map(item => toMemberRow(item, user.id))
-  const guestRows = state.guests.map(item => toGuestRow(item, user.id))
+  const memberRows = state.members.filter(item => item.name?.trim()).map(item => toMemberRow(item, user.id))
+  const guestRows = state.guests.filter(item => item.name?.trim()).map(item => toGuestRow(item, user.id))
+  const scopedPrefix = getPeopleCloudIdPrefix(user.id)
 
   const { error: memberDeleteError } = await supabase
     .from('tm_members')
     .delete()
     .eq('owner_id', user.id)
+    .like('id', `${scopedPrefix}%`)
 
   if (memberDeleteError) throw memberDeleteError
 
@@ -526,6 +539,7 @@ export async function savePeopleState(state) {
     .from('tm_guests')
     .delete()
     .eq('owner_id', user.id)
+    .like('id', `${scopedPrefix}%`)
 
   if (guestDeleteError) throw guestDeleteError
 
@@ -869,9 +883,24 @@ function fromHistoryRow(row) {
   }
 }
 
+function getPeopleCloudIdPrefix(ownerId) {
+  return `${ownerId}::${getActiveClubId()}::`
+}
+
+function toPeopleCloudId(id, ownerId) {
+  const rawId = `${id || Date.now()}`
+  if (rawId.includes('::')) return rawId
+  return `${getPeopleCloudIdPrefix(ownerId)}${rawId}`
+}
+
+function fromPeopleCloudId(id) {
+  const rawId = `${id || ''}`
+  return rawId.includes('::') ? rawId.split('::').pop() : rawId
+}
+
 function toMemberRow(item, ownerId) {
   return {
-    id: item.id,
+    id: toPeopleCloudId(item.id, ownerId),
     owner_id: ownerId,
     name: item.name,
     english_name: item.englishName || '',
@@ -886,7 +915,7 @@ function toMemberRow(item, ownerId) {
 
 function fromMemberRow(row) {
   return {
-    id: row.id,
+    id: fromPeopleCloudId(row.id),
     name: row.name,
     englishName: row.english_name || '',
     email: row.email || '',
@@ -900,7 +929,7 @@ function fromMemberRow(row) {
 
 function toGuestRow(item, ownerId) {
   return {
-    id: item.id,
+    id: toPeopleCloudId(item.id, ownerId),
     owner_id: ownerId,
     name: item.name,
     email: item.email || '',
@@ -913,7 +942,7 @@ function toGuestRow(item, ownerId) {
 
 function fromGuestRow(row) {
   return {
-    id: row.id,
+    id: fromPeopleCloudId(row.id),
     name: row.name,
     email: row.email || '',
     phone: row.phone || '',
