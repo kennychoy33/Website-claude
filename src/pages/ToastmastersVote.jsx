@@ -1729,13 +1729,14 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
   async function saveMeetingAll() {
     if (locked) return
     const syncedData = candidatesFromMeetingRoles(meetingOps.roles, people, data)
-    setData(syncedData)
-    await persistState(syncedData)
-    await persistMeetingOps(meetingOps)
+    const savedData = await persistState(syncedData) || syncedData
+    const activeMeetingId = savedData.meeting?.id || syncedData.meeting.id
+    setData(savedData)
+    await persistMeetingOps(meetingOps, activeMeetingId)
     const record = {
-      id: syncedData.meeting.id || `${Date.now()}`,
+      id: activeMeetingId || `${Date.now()}`,
       savedAt: new Date().toISOString(),
-      data: syncedData,
+      data: savedData,
       meetingOps,
     }
     const nextRecords = [
@@ -1744,7 +1745,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
     ]
     setRecords(nextRecords)
     localStorage.setItem(meetingRecordKey(), JSON.stringify(nextRecords))
-    setSelectedRecordId(record.id)
+    setSelectedRecordId('current')
   }
 
   function selectRecord(id) {
@@ -2154,8 +2155,10 @@ export default function ToastmastersVote() {
       if (result.data) setData(normalizeState(result.data))
       setSource(result.source)
       setSyncStatus(t.saved)
-    } catch {
-      setSyncStatus(t.saveFailed)
+      return result.data ? normalizeState(result.data) : next
+    } catch (err) {
+      setSyncStatus(err.message || t.saveFailed)
+      throw err
     }
   }
 
@@ -2169,13 +2172,14 @@ export default function ToastmastersVote() {
     }
   }
 
-  async function persistMeetingOps(next) {
+  async function persistMeetingOps(next, meetingId = '') {
     setSyncStatus(t.syncing)
     try {
-      await saveMeetingOpsState(next)
+      await saveMeetingOpsState(next, meetingId)
       setSyncStatus(t.meetingSaved)
-    } catch {
-      setSyncStatus(t.saveFailed)
+    } catch (err) {
+      setSyncStatus(err.message || t.saveFailed)
+      throw err
     }
   }
 

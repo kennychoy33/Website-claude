@@ -577,7 +577,7 @@ export async function loadMeetingOpsState(meetingId = '') {
   }
 }
 
-export async function saveMeetingOpsState(state) {
+export async function saveMeetingOpsState(state, meetingId = '') {
   if (!isCloudConfigured) {
     saveLocalMeetingOps(state)
     return { source: 'local' }
@@ -589,15 +589,15 @@ export async function saveMeetingOpsState(state) {
     return { source: 'local' }
   }
 
-  const meetingId = getMeetingId(user.id)
-  const attendanceRows = state.attendance.map(item => toAttendanceRow(item, user.id, meetingId))
-  const roleRows = state.roles.map(item => toRoleRow(item, user.id, meetingId))
+  const activeMeetingId = meetingId || getMeetingId(user.id)
+  const attendanceRows = state.attendance.map(item => toAttendanceRow(item, user.id, activeMeetingId))
+  const roleRows = state.roles.map(item => toRoleRow(item, user.id, activeMeetingId))
 
   const { error: attendanceDeleteError } = await supabase
     .from('tm_meeting_attendance')
     .delete()
     .eq('owner_id', user.id)
-    .eq('meeting_id', meetingId)
+    .eq('meeting_id', activeMeetingId)
 
   if (attendanceDeleteError) throw attendanceDeleteError
 
@@ -613,7 +613,7 @@ export async function saveMeetingOpsState(state) {
     .from('tm_meeting_roles')
     .delete()
     .eq('owner_id', user.id)
-    .eq('meeting_id', meetingId)
+    .eq('meeting_id', activeMeetingId)
 
   if (rolesDeleteError) throw rolesDeleteError
 
@@ -736,11 +736,13 @@ export async function saveVoteState(state) {
 
   if (deleteError) throw deleteError
 
-  const { error: candidateError } = await supabase
-    .from('tm_candidates')
-    .insert(candidateRows)
+  if (candidateRows.length) {
+    const { error: candidateError } = await supabase
+      .from('tm_candidates')
+      .insert(candidateRows)
 
-  if (candidateError) throw candidateError
+    if (candidateError) throw candidateError
+  }
 
   return {
     data: {
