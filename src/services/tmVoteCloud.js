@@ -772,22 +772,7 @@ export async function saveVoteState(state) {
     ...state.evaluator.map((item, index) => toCandidateRow(item, meetingId, 'evaluator', index)),
   ]
 
-  await upsertMeetingWithSchemaFallback(meetingRow)
-
-  const { error: deleteError } = await supabase
-    .from('tm_candidates')
-    .delete()
-    .eq('meeting_id', meetingId)
-
-  if (deleteError) throw deleteError
-
-  if (candidateRows.length) {
-    const { error: candidateError } = await supabase
-      .from('tm_candidates')
-      .insert(candidateRows)
-
-    if (candidateError) throw candidateError
-  }
+  await saveVoteSetupWithSchemaFallback(meetingRow, candidateRows)
 
   return {
     data: {
@@ -796,6 +781,22 @@ export async function saveVoteState(state) {
     },
     source: 'cloud',
   }
+}
+
+async function saveVoteSetupWithSchemaFallback(meetingRow, candidateRows) {
+  const { error: rpcError } = await supabase.rpc('tm_save_vote_setup', {
+    p_meeting: meetingRow,
+    p_candidates: candidateRows,
+  })
+
+  if (!rpcError) return
+  if (isMissingFunctionError(rpcError, 'tm_save_vote_setup')) {
+    throw new Error('云端数据库还没完成最新迁移，缺少 tm_save_vote_setup。请在 Supabase 执行 supabase/tm-vote-full-cloud-migration.sql 后重新登录。')
+  }
+  if (isRowLevelSecurityError(rpcError)) {
+    throw new Error('Supabase RLS 权限未更新，无法保存投票名单。请在 Supabase 执行 supabase/tm-vote-full-cloud-migration.sql 后重新登录。')
+  }
+  throw rpcError
 }
 
 export async function submitVote(state, preparedId, impromptuId, evaluatorId, voterToken) {
@@ -950,10 +951,10 @@ function isMissingColumnError(error, columnName) {
   return message.includes(`${columnName}`.toLowerCase()) && message.includes('schema cache')
 }
 
-function isMissingFunctionError(error) {
+function isMissingFunctionError(error, functionName = 'tm_save_meeting') {
   if (!error) return false
   const message = `${error.message || error.details || ''}`.toLowerCase()
-  return message.includes('tm_save_meeting') && (message.includes('schema cache') || message.includes('could not find the function'))
+  return message.includes(functionName.toLowerCase()) && (message.includes('schema cache') || message.includes('could not find the function'))
 }
 
 function isRowLevelSecurityError(error) {

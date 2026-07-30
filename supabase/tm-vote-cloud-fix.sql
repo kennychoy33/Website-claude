@@ -293,6 +293,80 @@ begin
 end;
 $$;
 
+create or replace function public.tm_save_vote_setup(
+  p_meeting jsonb,
+  p_candidates jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_meeting_id text := p_meeting->>'id';
+  v_club_id text := coalesce(nullif(p_meeting->>'club_id', ''), 'default');
+begin
+  if v_owner_id is null then
+    raise exception 'not_authenticated';
+  end if;
+
+  if v_meeting_id is null or v_meeting_id = '' then
+    raise exception 'missing_meeting_id';
+  end if;
+
+  perform public.tm_save_meeting(
+    v_meeting_id,
+    v_club_id,
+    p_meeting->>'meeting_number',
+    p_meeting->>'meeting_date',
+    p_meeting->>'theme',
+    p_meeting->>'word_of_day',
+    p_meeting->>'close_time',
+    p_meeting->>'status',
+    p_meeting->>'public_link'
+  );
+
+  delete from public.tm_candidates
+  where meeting_id = v_meeting_id
+    and exists (
+      select 1 from public.tm_meetings
+      where tm_meetings.id = v_meeting_id
+        and tm_meetings.owner_id = v_owner_id
+        and tm_meetings.club_id = v_club_id
+    );
+
+  insert into public.tm_candidates (
+    id,
+    meeting_id,
+    category,
+    name,
+    speech_title,
+    project,
+    votes,
+    sort_order
+  )
+  select
+    candidate->>'id',
+    v_meeting_id,
+    candidate->>'category',
+    coalesce(candidate->>'name', ''),
+    coalesce(candidate->>'speech_title', ''),
+    coalesce(candidate->>'project', ''),
+    coalesce((candidate->>'votes')::integer, 0),
+    coalesce((candidate->>'sort_order')::integer, 0)
+  from jsonb_array_elements(coalesce(p_candidates, '[]'::jsonb)) as candidate
+  where coalesce(candidate->>'id', '') <> ''
+    and coalesce(candidate->>'category', '') in ('prepared', 'impromptu', 'evaluator');
+
+  return jsonb_build_object(
+    'id', v_meeting_id,
+    'owner_id', v_owner_id,
+    'candidate_count', jsonb_array_length(coalesce(p_candidates, '[]'::jsonb))
+  );
+end;
+$$;
+
 alter table public.tm_meetings enable row level security;
 alter table public.tm_candidates enable row level security;
 alter table public.tm_votes enable row level security;
@@ -456,5 +530,6 @@ grant all on public.tm_meeting_attendance to authenticated;
 grant all on public.tm_meeting_roles to authenticated;
 grant execute on function public.tm_submit_vote(text, text, text, text, text) to anon, authenticated;
 grant execute on function public.tm_save_meeting(text, text, text, text, text, text, text, text, text) to authenticated;
+grant execute on function public.tm_save_vote_setup(jsonb, jsonb) to authenticated;
 
 notify pgrst, 'reload schema';
