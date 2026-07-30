@@ -778,6 +778,9 @@ export async function saveVoteState(state) {
     data: {
       ...state,
       meeting,
+      prepared: candidateRows.filter(item => item.category === 'prepared').map(fromCandidateRow),
+      impromptu: candidateRows.filter(item => item.category === 'impromptu').map(fromCandidateRow),
+      evaluator: candidateRows.filter(item => item.category === 'evaluator').map(fromCandidateRow),
     },
     source: 'cloud',
   }
@@ -807,11 +810,14 @@ export async function submitVote(state, preparedId, impromptuId, evaluatorId, vo
   }
 
   const meetingId = state.meeting.id || TM_VOTE_MEETING_ID
+  const normalizedPreparedId = normalizeCandidateId(preparedId, meetingId)
+  const normalizedImpromptuId = normalizeCandidateId(impromptuId, meetingId)
+  const normalizedEvaluatorId = normalizeCandidateId(evaluatorId, meetingId)
   const { data, error } = await supabase.rpc('tm_submit_vote', {
     p_meeting_id: meetingId,
-    p_prepared_candidate_id: preparedId,
-    p_impromptu_candidate_id: impromptuId,
-    p_evaluator_candidate_id: evaluatorId,
+    p_prepared_candidate_id: normalizedPreparedId,
+    p_impromptu_candidate_id: normalizedImpromptuId,
+    p_evaluator_candidate_id: normalizedEvaluatorId,
     p_voter_token: voterToken,
   })
 
@@ -823,6 +829,12 @@ export async function submitVote(state, preparedId, impromptuId, evaluatorId, vo
   }
 
   return loadVoteState(getSpaceIdFromMeetingId(meetingId))
+}
+
+function normalizeCandidateId(candidateId, meetingId) {
+  const rawId = `${candidateId || ''}`
+  if (!rawId || rawId.startsWith(`${meetingId}-`)) return rawId
+  return `${meetingId}-${rawId}`
 }
 
 export function getOrCreateVoterToken(meetingNumber) {
