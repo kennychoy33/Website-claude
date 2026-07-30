@@ -1186,7 +1186,10 @@ function VoteView({ data, setData, setView, t, spaceId }) {
       markLocalVoted(meetingVoteKey)
       setView('success')
     } catch (err) {
-      setError(err.code === 'already_voted' ? t.duplicateVote : t.saveFailed)
+      const message = err?.code === 'already_voted'
+        ? t.duplicateVote
+        : `${t.saveFailed} ${err?.message || ''}`.trim()
+      setError(message)
     } finally {
       setSubmitting(false)
     }

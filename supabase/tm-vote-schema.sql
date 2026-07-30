@@ -398,7 +398,7 @@ drop policy if exists "tm roles owner all" on public.tm_meeting_roles;
 
 create policy "tm meetings public read"
 on public.tm_meetings for select
-to anon
+to anon, authenticated
 using (true);
 
 create policy "tm meetings public write"
@@ -414,7 +414,7 @@ with check (owner_id = (select auth.uid()));
 
 create policy "tm candidates public read"
 on public.tm_candidates for select
-to anon
+to anon, authenticated
 using (true);
 
 create policy "tm candidates public write"
@@ -459,22 +459,22 @@ using (
 
 create policy "tm votes public insert"
 on public.tm_votes for insert
-to anon
+to anon, authenticated
 with check (true);
 
 create policy "tm history public read"
 on public.tm_winner_history for select
-to anon
+to anon, authenticated
 using (true);
 
 create policy "tm history public write"
 on public.tm_winner_history for insert
-to anon
+to anon, authenticated
 with check (true);
 
 create policy "tm club settings public read"
 on public.tm_club_settings for select
-to anon
+to anon, authenticated
 using (true);
 
 create policy "tm club settings owner all"
