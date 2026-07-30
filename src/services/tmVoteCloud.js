@@ -878,24 +878,13 @@ async function upsertMeetingWithSchemaFallback(meetingRow) {
   })
 
   if (!rpcError) return
-  if (!isMissingFunctionError(rpcError)) throw rpcError
-
-  const optionalColumns = ['word_of_day', 'close_time', 'status', 'public_link', 'created_at', 'updated_at']
-  let row = { ...meetingRow }
-
-  for (let attempt = 0; attempt <= optionalColumns.length; attempt += 1) {
-    const { error } = await supabase
-      .from('tm_meetings')
-      .upsert(row)
-
-    if (!error) return
-
-    const missingColumn = optionalColumns.find(column => isMissingColumnError(error, column) && column in row)
-    if (!missingColumn) throw error
-
-    const { [missingColumn]: _removed, ...nextRow } = row
-    row = nextRow
+  if (isMissingFunctionError(rpcError)) {
+    throw new Error('云端数据库还没完成最新迁移，缺少 tm_save_meeting。请在 Supabase 执行 supabase/tm-vote-full-cloud-migration.sql 后重新登录。')
   }
+  if (isRowLevelSecurityError(rpcError)) {
+    throw new Error('Supabase RLS 权限未更新。请在 Supabase 执行 supabase/tm-vote-full-cloud-migration.sql 后重新登录。')
+  }
+  throw rpcError
 }
 
 function fromMeetingRow(row) {
@@ -964,6 +953,12 @@ function isMissingFunctionError(error) {
   if (!error) return false
   const message = `${error.message || error.details || ''}`.toLowerCase()
   return message.includes('tm_save_meeting') && (message.includes('schema cache') || message.includes('could not find the function'))
+}
+
+function isRowLevelSecurityError(error) {
+  if (!error) return false
+  const message = `${error.message || error.details || ''}`.toLowerCase()
+  return message.includes('row-level security') || message.includes('violates row-level security policy')
 }
 
 function getPeopleCloudIdPrefix(ownerId) {
