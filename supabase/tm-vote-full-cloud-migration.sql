@@ -209,6 +209,73 @@ begin
 end;
 $$;
 
+create or replace function public.tm_save_meeting(
+  p_id text,
+  p_meeting_number text,
+  p_meeting_date text,
+  p_theme text,
+  p_word_of_day text,
+  p_close_time text,
+  p_status text,
+  p_public_link text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+begin
+  if v_owner_id is null then
+    raise exception 'not_authenticated';
+  end if;
+
+  insert into public.tm_meetings (
+    id,
+    owner_id,
+    meeting_number,
+    meeting_date,
+    theme,
+    word_of_day,
+    close_time,
+    status,
+    public_link,
+    updated_at
+  )
+  values (
+    p_id,
+    v_owner_id,
+    coalesce(p_meeting_number, ''),
+    coalesce(p_meeting_date, ''),
+    coalesce(p_theme, ''),
+    p_word_of_day,
+    p_close_time,
+    coalesce(p_status, 'draft'),
+    p_public_link,
+    now()
+  )
+  on conflict (id) do update set
+    owner_id = excluded.owner_id,
+    meeting_number = excluded.meeting_number,
+    meeting_date = excluded.meeting_date,
+    theme = excluded.theme,
+    word_of_day = excluded.word_of_day,
+    close_time = excluded.close_time,
+    status = excluded.status,
+    public_link = excluded.public_link,
+    updated_at = now()
+  where public.tm_meetings.owner_id is null
+     or public.tm_meetings.owner_id = v_owner_id;
+
+  if not found then
+    raise exception 'meeting_belongs_to_another_owner';
+  end if;
+
+  return jsonb_build_object('id', p_id, 'owner_id', v_owner_id);
+end;
+$$;
+
 alter table public.tm_meetings enable row level security;
 alter table public.tm_candidates enable row level security;
 alter table public.tm_votes enable row level security;
@@ -251,7 +318,7 @@ with check (owner_id = (select auth.uid()));
 create policy "tm meetings public update"
 on public.tm_meetings for update
 to authenticated
-using (owner_id = (select auth.uid()))
+using (owner_id is null or owner_id = (select auth.uid()))
 with check (owner_id = (select auth.uid()));
 
 create policy "tm candidates public read"
@@ -371,5 +438,6 @@ grant all on public.tm_guests to authenticated;
 grant all on public.tm_meeting_attendance to authenticated;
 grant all on public.tm_meeting_roles to authenticated;
 grant execute on function public.tm_submit_vote(text, text, text, text, text) to anon, authenticated;
+grant execute on function public.tm_save_meeting(text, text, text, text, text, text, text, text) to authenticated;
 
 notify pgrst, 'reload schema';

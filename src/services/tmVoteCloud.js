@@ -866,7 +866,21 @@ function toMeetingRow(meeting, meetingId, ownerId) {
 }
 
 async function upsertMeetingWithSchemaFallback(meetingRow) {
-  const optionalColumns = ['owner_id', 'word_of_day', 'close_time', 'status', 'public_link', 'created_at', 'updated_at']
+  const { error: rpcError } = await supabase.rpc('tm_save_meeting', {
+    p_id: meetingRow.id,
+    p_meeting_number: meetingRow.meeting_number,
+    p_meeting_date: meetingRow.meeting_date,
+    p_theme: meetingRow.theme,
+    p_word_of_day: meetingRow.word_of_day || '',
+    p_close_time: meetingRow.close_time || '',
+    p_status: meetingRow.status || 'draft',
+    p_public_link: meetingRow.public_link || '',
+  })
+
+  if (!rpcError) return
+  if (!isMissingFunctionError(rpcError)) throw rpcError
+
+  const optionalColumns = ['word_of_day', 'close_time', 'status', 'public_link', 'created_at', 'updated_at']
   let row = { ...meetingRow }
 
   for (let attempt = 0; attempt <= optionalColumns.length; attempt += 1) {
@@ -944,6 +958,12 @@ function isMissingColumnError(error, columnName) {
   if (!error) return false
   const message = `${error.message || error.details || ''}`.toLowerCase()
   return message.includes(`${columnName}`.toLowerCase()) && message.includes('schema cache')
+}
+
+function isMissingFunctionError(error) {
+  if (!error) return false
+  const message = `${error.message || error.details || ''}`.toLowerCase()
+  return message.includes('tm_save_meeting') && (message.includes('schema cache') || message.includes('could not find the function'))
 }
 
 function getPeopleCloudIdPrefix(ownerId) {
