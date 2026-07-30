@@ -850,20 +850,15 @@ function normalizeCandidateId(candidateId, meetingId) {
 }
 
 export function getOrCreateVoterToken(meetingNumber) {
-  const key = `${TM_VOTE_STORAGE_KEY}-voter-${meetingNumber}`
-  const saved = localStorage.getItem(key)
-  if (saved) return saved
-  const token = crypto.randomUUID()
-  localStorage.setItem(key, token)
-  return token
+  return `${meetingNumber}-${crypto.randomUUID()}`
 }
 
 export function hasLocalVote(meetingNumber) {
-  return localStorage.getItem(`${TM_VOTE_STORAGE_KEY}-voted-${meetingNumber}`) === '1'
+  return sessionStorage.getItem(`${TM_VOTE_STORAGE_KEY}-voted-${meetingNumber}`) === '1'
 }
 
 export function markLocalVoted(meetingNumber) {
-  localStorage.setItem(`${TM_VOTE_STORAGE_KEY}-voted-${meetingNumber}`, '1')
+  sessionStorage.setItem(`${TM_VOTE_STORAGE_KEY}-voted-${meetingNumber}`, '1')
 }
 
 function incrementLocalVotes(state, preparedId, impromptuId, evaluatorId) {
