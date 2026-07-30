@@ -1597,6 +1597,26 @@ function candidatesFromMeetingRoles(roles, people, existingData) {
   }
 }
 
+function agendaRowsFromTemplate(settings, roles = []) {
+  const nonRolePattern = /invocation|pledge|guest introduction|word of the day|timer report|ah counter report|grammarian report|awards presentation|president closing/i
+  const template = (settings.agendaRoleTemplate || [])
+    .filter(Boolean)
+    .map(role => (typeof role === 'string' ? { roleName: role, time: '' } : role))
+    .filter(role => !nonRolePattern.test(role.roleName || ''))
+  const roleMap = new Map((roles || []).map(role => [role.roleName, role]))
+  const source = template.length ? template : roles
+  return source.map((templateRole, index) => {
+    const assignedRole = roleMap.get(templateRole.roleName) || roles[index] || {}
+    return {
+      id: assignedRole.id || `${templateRole.roleName}-${index}`,
+      roleName: templateRole.roleName || assignedRole.roleName || '',
+      time: assignedRole.time || templateRole.time || '',
+      personType: assignedRole.personType || 'member',
+      personId: assignedRole.personId || '',
+    }
+  })
+}
+
 function meetingRecordKey() {
   return `tm-meeting-records-v1-${getActiveClubId()}`
 }
@@ -1670,11 +1690,18 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
     setMeetingOps({ ...meetingOps, roles: meetingOps.roles.filter(item => item.id !== id) })
   }
 
-  function resetRolesFromTemplate() {
+  async function resetRolesFromTemplate() {
     if (locked) return
     const roles = fullToastmastersRoles(settings)
+    const syncedData = candidatesFromMeetingRoles(roles, people, data)
     setMeetingOps({ ...meetingOps, roles })
-    setData(candidatesFromMeetingRoles(roles, people, data))
+    setData(syncedData)
+    try {
+      await persistState(syncedData)
+      await persistMeetingOps({ ...meetingOps, roles }, syncedData.meeting?.id)
+    } catch {
+      // Persist errors are already surfaced through syncStatus.
+    }
   }
 
   function createMeeting() {
@@ -1750,6 +1777,8 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
     localStorage.setItem(meetingRecordKey(), JSON.stringify(nextRecords))
     setSelectedRecordId('current')
   }
+
+  const agendaPrintRows = agendaRowsFromTemplate(settings, meetingOps.roles)
 
   function selectRecord(id) {
     setSelectedRecordId(id)
@@ -1895,26 +1924,44 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
             )}
           </div>
         )}
-        <header>
+        <header className={settings.agendaTemplateDataUrl ? 'has-template' : ''}>
           {settings.logoDataUrl && <img className="tm-agenda-logo" src={settings.logoDataUrl} alt={t.clubShort} />}
           <h1>{t.club}</h1>
           <h2>{data.meeting.number} {t.regularMeeting}</h2>
           <p>{data.meeting.date} | {data.meeting.theme} | {t.word}: {data.meeting.word}</p>
         </header>
-        <div className="tm-agenda-columns">
-          <div>
-            <h3>{t.rolesTitle}</h3>
-            {meetingOps.roles.map(item => (
-              <p key={item.id}><b>{item.roleName || t.role}</b>{item.time ? ` (${item.time})` : ''}: {personLabel(people, item.personType, item.personId) || t.pending}</p>
-            ))}
+        <div className="tm-agenda-meta">
+          <span><b>{t.meetingNo}</b>{data.meeting.number || t.pending}</span>
+          <span><b>{t.date}</b>{data.meeting.date || t.pending}</span>
+          <span><b>{t.theme}</b>{data.meeting.theme || t.pending}</span>
+          <span><b>{t.closeTime}</b>{data.meeting.closeTime || t.pending}</span>
+        </div>
+        <div className="tm-print-role-table">
+          <div className="tm-print-role-head">
+            <span>{t.role}</span>
+            <span>{t.roleTime}</span>
+            <span>{t.assignee}</span>
           </div>
+          {agendaPrintRows.map(item => (
+            <div className="tm-print-role-row" key={item.id}>
+              <span>{item.roleName || t.role}</span>
+              <span>{item.time || '-'}</span>
+              <span>{personLabel(people, item.personType, item.personId) || t.pending}</span>
+            </div>
+          ))}
+        </div>
+        <div className="tm-agenda-summary">
           <div>
             <h3>{t.preparedSpeakers}</h3>
-            {data.prepared.map(item => <p key={item.id}><b>{item.name || t.pending}</b>: {item.title || t.pending}</p>)}
-            <h3>{t.evaluators}</h3>
-            {data.evaluator.map(item => <p key={item.id}>{item.name || t.pending}</p>)}
+            {data.prepared.map(item => <p key={item.id}><b>{item.name || t.pending}</b>{item.title ? ` - ${item.title}` : ''}</p>)}
+          </div>
+          <div>
             <h3>{t.tableTopics}</h3>
             {data.impromptu.map(item => <p key={item.id}>{item.name || t.pending}</p>)}
+          </div>
+          <div>
+            <h3>{t.evaluators}</h3>
+            {data.evaluator.map(item => <p key={item.id}>{item.name || t.pending}</p>)}
           </div>
         </div>
       </section>
