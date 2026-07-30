@@ -484,7 +484,7 @@ export async function loadPeopleState() {
     return {
       data: loadLocalPeople(),
       source: 'local',
-      warning: '云端数据库还没建立会员/嘉宾表，当前先使用本机暂存。请在 Supabase 执行 supabase/tm-vote-cloud-fix.sql。',
+      warning: '云端数据库还没完成完整迁移，当前先使用本机暂存。请在 Supabase 执行 supabase/tm-vote-full-cloud-migration.sql。',
     }
   }
 
@@ -537,7 +537,7 @@ export async function savePeopleState(state) {
     saveLocalPeople(state)
     return {
       source: 'local',
-      warning: '云端数据库还没建立会员/嘉宾表，已先保存到本机。请在 Supabase 执行 supabase/tm-vote-cloud-fix.sql。',
+      warning: '云端数据库还没完成完整迁移，已先保存到本机。请在 Supabase 执行 supabase/tm-vote-full-cloud-migration.sql。',
     }
   }
   if (memberDeleteError) throw memberDeleteError
@@ -551,7 +551,7 @@ export async function savePeopleState(state) {
       saveLocalPeople(state)
       return {
         source: 'local',
-        warning: '云端数据库还没建立会员/嘉宾表，已先保存到本机。请在 Supabase 执行 supabase/tm-vote-cloud-fix.sql。',
+        warning: '云端数据库还没完成完整迁移，已先保存到本机。请在 Supabase 执行 supabase/tm-vote-full-cloud-migration.sql。',
       }
     }
     if (memberInsertError) throw memberInsertError
@@ -567,7 +567,7 @@ export async function savePeopleState(state) {
     saveLocalPeople(state)
     return {
       source: 'local',
-      warning: '云端数据库还没建立会员/嘉宾表，已先保存到本机。请在 Supabase 执行 supabase/tm-vote-cloud-fix.sql。',
+      warning: '云端数据库还没完成完整迁移，已先保存到本机。请在 Supabase 执行 supabase/tm-vote-full-cloud-migration.sql。',
     }
   }
   if (guestDeleteError) throw guestDeleteError
@@ -581,7 +581,7 @@ export async function savePeopleState(state) {
       saveLocalPeople(state)
       return {
         source: 'local',
-        warning: '云端数据库还没建立会员/嘉宾表，已先保存到本机。请在 Supabase 执行 supabase/tm-vote-cloud-fix.sql。',
+        warning: '云端数据库还没完成完整迁移，已先保存到本机。请在 Supabase 执行 supabase/tm-vote-full-cloud-migration.sql。',
       }
     }
     if (guestInsertError) throw guestInsertError

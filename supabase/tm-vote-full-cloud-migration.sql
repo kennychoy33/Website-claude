@@ -370,5 +370,6 @@ grant all on public.tm_members to authenticated;
 grant all on public.tm_guests to authenticated;
 grant all on public.tm_meeting_attendance to authenticated;
 grant all on public.tm_meeting_roles to authenticated;
+grant execute on function public.tm_submit_vote(text, text, text, text, text) to anon, authenticated;
 
 notify pgrst, 'reload schema';
