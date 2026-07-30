@@ -2139,6 +2139,25 @@ export default function ToastmastersVote() {
     return () => { ignore = true }
   }, [authReady, user, publicView, data?.meeting?.id, selectedClubId])
 
+  useEffect(() => {
+    if (publicView || !authReady || (isCloudConfigured && !user) || !['results', 'history'].includes(view)) return undefined
+    let ignore = false
+    async function refreshResults() {
+      try {
+        setActiveClubId(selectedClubId)
+        const result = await loadVoteState('', selectedClubId)
+        if (!ignore) {
+          setData(normalizeState(result.data))
+          setSource(result.source)
+        }
+      } catch (err) {
+        if (!ignore) setSyncStatus(err.message || t.loadFailed)
+      }
+    }
+    refreshResults()
+    return () => { ignore = true }
+  }, [authReady, user, publicView, view, selectedClubId, t.loadFailed])
+
   function switchClub(clubId) {
     setSelectedClubId(clubId)
     setActiveClubId(clubId)

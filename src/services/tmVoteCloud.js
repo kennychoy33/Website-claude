@@ -114,6 +114,16 @@ const activeCloudConfig = getActiveCloudConfig()
 export const isCloudConfigured = Boolean(activeCloudConfig.url && activeCloudConfig.anonKey)
 
 const supabase = isCloudConfigured ? createClient(activeCloudConfig.url, activeCloudConfig.anonKey) : null
+const publicSupabase = isCloudConfigured
+  ? createClient(activeCloudConfig.url, activeCloudConfig.anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storageKey: `${TM_VOTE_STORAGE_KEY}-public-client`,
+    },
+  })
+  : null
 
 export async function getCurrentUser() {
   if (!supabase) return null
@@ -689,7 +699,8 @@ export async function loadVoteState(spaceId = '', clubId = getActiveClubId()) {
   }
   const meetingId = getMeetingId(activeSpace, clubId)
 
-  const { data: meeting, error: meetingError } = await supabase
+  const readClient = publicSupabase || supabase
+  const { data: meeting, error: meetingError } = await readClient
     .from('tm_meetings')
     .select('*')
     .eq('id', meetingId)
@@ -723,12 +734,12 @@ export async function loadVoteState(spaceId = '', clubId = getActiveClubId()) {
   }
 
   const [{ data: candidates, error: candidateError }, { data: history, error: historyError }] = await Promise.all([
-    supabase
+    readClient
       .from('tm_candidates')
       .select('*')
       .eq('meeting_id', meeting.id)
       .order('sort_order', { ascending: true }),
-    supabase
+    readClient
       .from('tm_winner_history')
       .select('*')
       .order('meeting_date', { ascending: false })
@@ -813,7 +824,8 @@ export async function submitVote(state, preparedId, impromptuId, evaluatorId, vo
   const normalizedPreparedId = normalizeCandidateId(preparedId, meetingId)
   const normalizedImpromptuId = normalizeCandidateId(impromptuId, meetingId)
   const normalizedEvaluatorId = normalizeCandidateId(evaluatorId, meetingId)
-  const { data, error } = await supabase.rpc('tm_submit_vote', {
+  const voteClient = publicSupabase || supabase
+  const { data, error } = await voteClient.rpc('tm_submit_vote', {
     p_meeting_id: meetingId,
     p_prepared_candidate_id: normalizedPreparedId,
     p_impromptu_candidate_id: normalizedImpromptuId,
