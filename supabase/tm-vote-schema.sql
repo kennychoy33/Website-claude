@@ -42,6 +42,7 @@ create table if not exists public.tm_meeting_roles (
 
 alter table public.tm_meetings
   add column if not exists owner_id uuid references auth.users(id) on delete cascade,
+  add column if not exists club_id text not null default 'default',
   add column if not exists meeting_number text,
   add column if not exists meeting_date text,
   add column if not exists theme text,
@@ -71,6 +72,8 @@ alter table public.tm_votes
   add column if not exists created_at timestamptz not null default now();
 
 alter table public.tm_winner_history
+  add column if not exists owner_id uuid references auth.users(id) on delete cascade,
+  add column if not exists club_id text not null default 'default',
   add column if not exists meeting_number text,
   add column if not exists meeting_date text,
   add column if not exists prepared_winner text,
@@ -83,6 +86,7 @@ alter table public.tm_winner_history
 
 alter table public.tm_club_settings
   add column if not exists owner_id uuid references auth.users(id) on delete cascade,
+  add column if not exists club_id text not null default 'default',
   add column if not exists club_name text,
   add column if not exists club_short text,
   add column if not exists toastmaster_id text,
@@ -97,6 +101,7 @@ alter table public.tm_club_settings
 
 alter table public.tm_club_admins
   add column if not exists owner_id uuid references auth.users(id) on delete cascade,
+  add column if not exists club_id text not null default 'default',
   add column if not exists toastmaster_id text,
   add column if not exists username text,
   add column if not exists password_hint text,
@@ -105,6 +110,7 @@ alter table public.tm_club_admins
 
 alter table public.tm_members
   add column if not exists owner_id uuid references auth.users(id) on delete cascade,
+  add column if not exists club_id text not null default 'default',
   add column if not exists name text,
   add column if not exists english_name text,
   add column if not exists email text,
@@ -118,6 +124,7 @@ alter table public.tm_members
 
 alter table public.tm_guests
   add column if not exists owner_id uuid references auth.users(id) on delete cascade,
+  add column if not exists club_id text not null default 'default',
   add column if not exists name text,
   add column if not exists email text,
   add column if not exists phone text,
@@ -128,6 +135,7 @@ alter table public.tm_guests
 
 alter table public.tm_meeting_attendance
   add column if not exists owner_id uuid references auth.users(id) on delete cascade,
+  add column if not exists club_id text not null default 'default',
   add column if not exists meeting_id text references public.tm_meetings(id) on delete cascade,
   add column if not exists person_type text,
   add column if not exists person_id text,
@@ -136,6 +144,7 @@ alter table public.tm_meeting_attendance
 
 alter table public.tm_meeting_roles
   add column if not exists owner_id uuid references auth.users(id) on delete cascade,
+  add column if not exists club_id text not null default 'default',
   add column if not exists meeting_id text references public.tm_meetings(id) on delete cascade,
   add column if not exists role_name text,
   add column if not exists role_time text,
@@ -154,7 +163,8 @@ alter table public.tm_members
   check (status in ('active', 'inactive'));
 
 create unique index if not exists tm_votes_meeting_voter_unique on public.tm_votes(meeting_id, voter_token);
-create unique index if not exists tm_club_settings_owner_unique on public.tm_club_settings(owner_id);
+drop index if exists tm_club_settings_owner_unique;
+create unique index if not exists tm_club_settings_owner_club_unique on public.tm_club_settings(owner_id, club_id);
 create unique index if not exists tm_attendance_meeting_person_unique on public.tm_meeting_attendance(meeting_id, person_type, person_id);
 create index if not exists tm_members_owner_idx on public.tm_members(owner_id);
 create index if not exists tm_guests_owner_idx on public.tm_guests(owner_id);
@@ -162,6 +172,9 @@ create index if not exists tm_attendance_owner_meeting_idx on public.tm_meeting_
 create index if not exists tm_roles_owner_meeting_idx on public.tm_meeting_roles(owner_id, meeting_id);
 create index if not exists tm_club_settings_owner_idx on public.tm_club_settings(owner_id);
 create index if not exists tm_club_admins_owner_idx on public.tm_club_admins(owner_id);
+create index if not exists tm_members_owner_club_idx on public.tm_members(owner_id, club_id);
+create index if not exists tm_guests_owner_club_idx on public.tm_guests(owner_id, club_id);
+create index if not exists tm_meetings_owner_club_idx on public.tm_meetings(owner_id, club_id);
 
 create or replace function public.tm_submit_vote(
   p_meeting_id text,
@@ -211,6 +224,7 @@ $$;
 
 create or replace function public.tm_save_meeting(
   p_id text,
+  p_club_id text,
   p_meeting_number text,
   p_meeting_date text,
   p_theme text,
@@ -234,6 +248,7 @@ begin
   insert into public.tm_meetings (
     id,
     owner_id,
+    club_id,
     meeting_number,
     meeting_date,
     theme,
@@ -246,6 +261,7 @@ begin
   values (
     p_id,
     v_owner_id,
+    coalesce(p_club_id, 'default'),
     coalesce(p_meeting_number, ''),
     coalesce(p_meeting_date, ''),
     coalesce(p_theme, ''),
@@ -257,6 +273,7 @@ begin
   )
   on conflict (id) do update set
     owner_id = excluded.owner_id,
+    club_id = excluded.club_id,
     meeting_number = excluded.meeting_number,
     meeting_date = excluded.meeting_date,
     theme = excluded.theme,
@@ -266,7 +283,7 @@ begin
     public_link = excluded.public_link,
     updated_at = now()
   where public.tm_meetings.owner_id is null
-     or public.tm_meetings.owner_id = v_owner_id;
+     or (public.tm_meetings.owner_id = v_owner_id and public.tm_meetings.club_id = coalesce(p_club_id, 'default'));
 
   if not found then
     raise exception 'meeting_belongs_to_another_owner';
@@ -438,6 +455,6 @@ grant all on public.tm_guests to authenticated;
 grant all on public.tm_meeting_attendance to authenticated;
 grant all on public.tm_meeting_roles to authenticated;
 grant execute on function public.tm_submit_vote(text, text, text, text, text) to anon, authenticated;
-grant execute on function public.tm_save_meeting(text, text, text, text, text, text, text, text) to authenticated;
+grant execute on function public.tm_save_meeting(text, text, text, text, text, text, text, text, text) to authenticated;
 
 notify pgrst, 'reload schema';

@@ -18,6 +18,10 @@ export function getActiveClubId() {
   return activeClubId || 'default'
 }
 
+function getActiveClubRowId() {
+  return getActiveClubId() || 'default'
+}
+
 function clubKey(key) {
   return `${key}-club-${getActiveClubId()}`
 }
@@ -369,11 +373,13 @@ export async function loadSystemSettings(spaceId = '') {
   }
 
   const ownerId = spaceId || user.id
+  const clubId = getActiveClubRowId()
 
   let { data, error } = await supabase
     .from('tm_club_settings')
     .select('owner_id, club_name, club_short, toastmaster_id, admin_name, username, logo_data_url, agenda_template_name, agenda_template_data_url, agenda_role_template')
     .eq('owner_id', ownerId)
+    .eq('club_id', clubId)
     .maybeSingle()
 
   if (error) {
@@ -381,6 +387,7 @@ export async function loadSystemSettings(spaceId = '') {
       .from('tm_club_settings')
       .select('owner_id, club_name, club_short, toastmaster_id, admin_name, username')
       .eq('owner_id', ownerId)
+      .eq('club_id', clubId)
       .maybeSingle()
     data = result.data
     error = result.error
@@ -395,6 +402,7 @@ export async function loadSystemSettings(spaceId = '') {
       .from('tm_club_admins')
       .select('*')
       .eq('owner_id', user.id)
+      .eq('club_id', clubId)
       .order('created_at', { ascending: true })
 
     if (!adminsError) {
@@ -419,20 +427,21 @@ export async function saveSystemSettings(settings) {
 
   const { error } = await supabase
     .from('tm_club_settings')
-    .upsert(toSystemSettingsRow(settings, user.id), { onConflict: 'owner_id' })
+    .upsert(toSystemSettingsRow(settings, user.id), { onConflict: 'owner_id,club_id' })
 
   if (error) {
     const { error: minimalError } = await supabase
       .from('tm_club_settings')
       .upsert({
         owner_id: user.id,
+        club_id: getActiveClubRowId(),
         club_name: settings.clubName,
         club_short: settings.clubShort,
         toastmaster_id: settings.toastmasterId,
         admin_name: settings.adminName,
         username: settings.username,
         updated_at: new Date().toISOString(),
-      }, { onConflict: 'owner_id' })
+      }, { onConflict: 'owner_id,club_id' })
 
     if (minimalError) throw minimalError
     return { source: 'cloud' }
@@ -442,6 +451,7 @@ export async function saveSystemSettings(settings) {
     .from('tm_club_admins')
     .delete()
     .eq('owner_id', user.id)
+    .eq('club_id', getActiveClubRowId())
 
   if (deleteAdminsError) return { source: 'cloud' }
 
@@ -472,11 +482,13 @@ export async function loadPeopleState() {
       .from('tm_members')
       .select('*')
       .eq('owner_id', user.id)
+      .eq('club_id', getActiveClubRowId())
       .order('name', { ascending: true }),
     supabase
       .from('tm_guests')
       .select('*')
       .eq('owner_id', user.id)
+      .eq('club_id', getActiveClubRowId())
       .order('visit_date', { ascending: false }),
   ])
 
@@ -491,21 +503,10 @@ export async function loadPeopleState() {
   if (memberError) throw memberError
   if (guestError) throw guestError
 
-  const scopedPrefix = getPeopleCloudIdPrefix(user.id)
-  const isCurrentClubRow = row => {
-    if (typeof row.id !== 'string' || !row.id.includes('::')) return true
-    return row.id.startsWith(scopedPrefix)
-  }
-
-  const scopedMembers = members.filter(isCurrentClubRow).filter(row => `${row.id}`.startsWith(scopedPrefix))
-  const scopedGuests = guests.filter(isCurrentClubRow).filter(row => `${row.id}`.startsWith(scopedPrefix))
-  const visibleMembers = scopedMembers.length ? scopedMembers : members.filter(isCurrentClubRow)
-  const visibleGuests = scopedGuests.length ? scopedGuests : guests.filter(isCurrentClubRow)
-
   return {
     data: {
-      members: visibleMembers.map(fromMemberRow),
-      guests: visibleGuests.map(fromGuestRow),
+      members: members.map(fromMemberRow),
+      guests: guests.map(fromGuestRow),
     },
     source: 'cloud',
   }
@@ -525,13 +526,11 @@ export async function savePeopleState(state) {
 
   const memberRows = state.members.filter(item => item.name?.trim()).map(item => toMemberRow(item, user.id))
   const guestRows = state.guests.filter(item => item.name?.trim()).map(item => toGuestRow(item, user.id))
-  const scopedPrefix = getPeopleCloudIdPrefix(user.id)
-
   const { error: memberDeleteError } = await supabase
     .from('tm_members')
     .delete()
     .eq('owner_id', user.id)
-    .like('id', `${scopedPrefix}%`)
+    .eq('club_id', getActiveClubRowId())
 
   if (isMissingSchemaError(memberDeleteError)) {
     saveLocalPeople(state)
@@ -561,7 +560,7 @@ export async function savePeopleState(state) {
     .from('tm_guests')
     .delete()
     .eq('owner_id', user.id)
-    .like('id', `${scopedPrefix}%`)
+    .eq('club_id', getActiveClubRowId())
 
   if (isMissingSchemaError(guestDeleteError)) {
     saveLocalPeople(state)
@@ -855,6 +854,7 @@ function toMeetingRow(meeting, meetingId, ownerId) {
   return {
     id: meetingId,
     owner_id: ownerId,
+    club_id: getActiveClubRowId(),
     meeting_number: meeting.number,
     meeting_date: meeting.date,
     theme: meeting.theme,
@@ -868,6 +868,7 @@ function toMeetingRow(meeting, meetingId, ownerId) {
 async function upsertMeetingWithSchemaFallback(meetingRow) {
   const { error: rpcError } = await supabase.rpc('tm_save_meeting', {
     p_id: meetingRow.id,
+    p_club_id: meetingRow.club_id || getActiveClubRowId(),
     p_meeting_number: meetingRow.meeting_number,
     p_meeting_date: meetingRow.meeting_date,
     p_theme: meetingRow.theme,
@@ -980,6 +981,7 @@ function toMemberRow(item, ownerId) {
   return {
     id: toPeopleCloudId(item.id, ownerId),
     owner_id: ownerId,
+    club_id: getActiveClubRowId(),
     name: item.name,
     english_name: item.englishName || '',
     email: item.email || '',
@@ -1009,6 +1011,7 @@ function toGuestRow(item, ownerId) {
   return {
     id: toPeopleCloudId(item.id, ownerId),
     owner_id: ownerId,
+    club_id: getActiveClubRowId(),
     name: item.name,
     email: item.email || '',
     phone: item.phone || '',
@@ -1033,6 +1036,7 @@ function fromGuestRow(row) {
 function toAttendanceRow(item, ownerId, meetingId) {
   return {
     owner_id: ownerId,
+    club_id: getActiveClubRowId(),
     meeting_id: meetingId,
     person_type: item.personType,
     person_id: item.personId,
@@ -1052,6 +1056,7 @@ function fromAttendanceRow(row) {
 function toRoleRow(item, ownerId, meetingId) {
   return {
     owner_id: ownerId,
+    club_id: getActiveClubRowId(),
     meeting_id: meetingId,
     role_name: item.roleName,
     role_time: item.time,
@@ -1073,6 +1078,7 @@ function fromRoleRow(row) {
 function toSystemSettingsRow(settings, ownerId) {
   return {
     owner_id: ownerId,
+    club_id: getActiveClubRowId(),
     club_name: settings.clubName,
     club_short: settings.clubShort,
     toastmaster_id: settings.toastmasterId,
@@ -1102,8 +1108,9 @@ function fromSystemSettingsRow(row) {
 
 function toClubAdminRow(admin, ownerId) {
   return {
-    id: admin.id,
+    id: toPeopleCloudId(admin.id, ownerId),
     owner_id: ownerId,
+    club_id: getActiveClubRowId(),
     toastmaster_id: admin.toastmasterId,
     username: admin.username,
     password_hint: admin.password,
@@ -1113,7 +1120,7 @@ function toClubAdminRow(admin, ownerId) {
 
 function fromClubAdminRow(row) {
   return {
-    id: row.id,
+    id: fromPeopleCloudId(row.id),
     toastmasterId: row.toastmaster_id || '',
     username: row.username || '',
     password: row.password_hint || '',
