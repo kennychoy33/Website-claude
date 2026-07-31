@@ -1697,8 +1697,9 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
     setMeetingOps({ ...meetingOps, roles })
     setData(syncedData)
     try {
-      await persistState(syncedData)
-      await persistMeetingOps({ ...meetingOps, roles }, syncedData.meeting?.id)
+      const savedData = await persistState(syncedData) || syncedData
+      setData(savedData)
+      await persistMeetingOps({ ...meetingOps, roles }, savedData.meeting?.id)
     } catch {
       // Persist errors are already surfaced through syncStatus.
     }

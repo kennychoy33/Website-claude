@@ -648,9 +648,11 @@ export async function saveMeetingOpsState(state, meetingId = '') {
     return { source: 'local' }
   }
 
-  const activeMeetingId = meetingId || getMeetingId(user.id)
+  const activeMeetingId = normalizeMeetingIdForOwner(meetingId, user.id)
   const attendanceRows = state.attendance.map(item => toAttendanceRow(item, user.id, activeMeetingId))
   const roleRows = state.roles.map(item => toRoleRow(item, user.id, activeMeetingId))
+
+  await ensureMeetingRowForOps(activeMeetingId, user.id)
 
   const { error: attendanceDeleteError } = await supabase
     .from('tm_meeting_attendance')
@@ -685,6 +687,38 @@ export async function saveMeetingOpsState(state, meetingId = '') {
   }
 
   return { source: 'cloud' }
+}
+
+function normalizeMeetingIdForOwner(meetingId, ownerId) {
+  const rawId = `${meetingId || ''}`
+  if (!rawId) return getMeetingId(ownerId)
+  if (rawId.startsWith(`${ownerId}-`)) return rawId
+  if (rawId === TM_VOTE_MEETING_ID || /^\d+$/.test(rawId)) return getMeetingId(ownerId)
+  return rawId
+}
+
+async function ensureMeetingRowForOps(meetingId, ownerId) {
+  const { data, error } = await supabase
+    .from('tm_meetings')
+    .select('id')
+    .eq('id', meetingId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (data) return
+
+  await upsertMeetingWithSchemaFallback({
+    id: meetingId,
+    owner_id: ownerId,
+    club_id: getActiveClubRowId(),
+    meeting_number: '',
+    meeting_date: '',
+    theme: '',
+    word_of_day: '',
+    close_time: '',
+    status: 'draft',
+    public_link: getPublicVoteUrl(ownerId, getActiveClubId()),
+  })
 }
 
 export async function loadVoteState(spaceId = '', clubId = getActiveClubId()) {
