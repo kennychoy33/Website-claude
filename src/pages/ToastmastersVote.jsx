@@ -1628,6 +1628,58 @@ function agendaRowsFromTemplate(settings, roles = []) {
   })
 }
 
+function minutesFromRoleTime(value = '') {
+  const match = String(value || '').match(/\d+/)
+  return match ? Number(match[0]) : 3
+}
+
+function formatAgendaTime(totalMinutes) {
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return `${hours}:${String(minutes).padStart(2, '0')}`
+}
+
+function agendaRoleSummary(role, people, data) {
+  const roleName = role.roleName || ''
+  const person = personLabel(people, role.personType, role.personId)
+  const speaker = [...(data.prepared || []), ...(data.impromptu || []), ...(data.evaluator || [])]
+    .find(item => item.name && item.name === person)
+  const normalized = normalizeAgendaText(roleName)
+  if (/toastmaster of the evening/i.test(roleName)) return '司仪介绍节目流程'
+  if (/sergeant/i.test(roleName)) return '礼宾司致欢迎词'
+  if (/president/i.test(roleName)) return '会长致开会词'
+  if (/timer/i.test(roleName)) return '计时员说明时间规则'
+  if (/ah counter/i.test(roleName)) return '尾音计算员说明规则'
+  if (/grammarian/i.test(roleName)) return '语言评论员介绍每日一词'
+  if (/table topics master/i.test(roleName)) return '即席演讲环节'
+  if (/table topics speaker/i.test(roleName)) return roleName.replace(/Table Topics Speaker/i, '即席讲员')
+  if (/general evaluator/i.test(roleName)) return '总评论'
+  if (/^evaluator/i.test(roleName)) return speaker?.title ? `评论：${speaker.title}` : roleName.replace(/Evaluator/i, '评论')
+  if (/prepared speaker/i.test(roleName)) {
+    const title = speaker?.title ? `｜题目：${speaker.title}` : ''
+    const project = speaker?.project || ''
+    return `${project || roleName}${title}`
+  }
+  if (normalized.includes('\u6280\u672f')) return '技术经理'
+  return roleName
+}
+
+function agendaScheduleRows(rows, people, data) {
+  let current = 19 * 60 + 15
+  return rows.map((role, index) => {
+    const duration = minutesFromRoleTime(role.time)
+    const item = {
+      id: role.id || `${role.roleName}-${index}`,
+      time: formatAgendaTime(current),
+      summary: agendaRoleSummary(role, people, data),
+      person: personLabel(people, role.personType, role.personId),
+      duration: role.time || `${duration}`,
+    }
+    current += duration
+    return item
+  })
+}
+
 function meetingRecordKey() {
   return `tm-meeting-records-v1-${getActiveClubId()}`
 }
@@ -1940,6 +1992,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
   }
 
   const agendaPrintRows = agendaRowsFromTemplate(settings, meetingOps.roles)
+  const agendaSchedule = agendaScheduleRows(agendaPrintRows, people, data)
 
   function printAgenda() {
     setMeetingActionStatus(t.printAgenda)
@@ -2129,46 +2182,63 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
 
       <section className="tm-agenda-print">
         <div className="tm-agenda-content">
-          <header className={settings.agendaTemplateDataUrl ? 'has-template' : ''}>
-            {settings.logoDataUrl && <img className="tm-agenda-logo" src={settings.logoDataUrl} alt={t.clubShort} />}
-            <h1>{t.club}</h1>
-            <h2>{data.meeting.number} {t.regularMeeting}</h2>
-            <p>{data.meeting.date} | {data.meeting.theme} | {t.word}: {data.meeting.word}</p>
+          <div className="tm-agenda-topline"></div>
+          <header className="tm-agenda-template-head">
+            <div className="tm-agenda-logo-box">
+              {settings.logoDataUrl && <img className="tm-agenda-logo" src={settings.logoDataUrl} alt={t.clubShort} />}
+            </div>
+            <div>
+              <h1>{t.club}</h1>
+              <p>CHUNG HWA ALUMNI ASSOCIATION MANDARIN TOASTMASTERS CLUB</p>
+            </div>
+            <div className="tm-agenda-club-id">{settings.toastmasterId || 'Toastmasters Club'}</div>
           </header>
-          <div className="tm-agenda-meta">
-            <span><b>{t.meetingNo}</b>{data.meeting.number || t.pending}</span>
-            <span><b>{t.date}</b>{data.meeting.date || t.pending}</span>
-            <span><b>{t.theme}</b>{data.meeting.theme || t.pending}</span>
-            <span><b>{t.closeTime}</b>{data.meeting.closeTime || t.pending}</span>
+          <h2 className="tm-agenda-title">{data.meeting.number || t.currentMeeting}例常活动议程表</h2>
+          <div className="tm-agenda-pills">
+            <span>{data.meeting.date || t.pending}</span>
+            <span>主题：{data.meeting.theme || t.pending}</span>
+            <span>每日一词：{data.meeting.word || t.pending}</span>
           </div>
-          <div className="tm-print-role-table">
-            <div className="tm-print-role-head">
-              <span>{t.role}</span>
-              <span>{t.roleTime}</span>
-              <span>{t.assignee}</span>
-            </div>
-            {agendaPrintRows.map(item => (
-              <div className="tm-print-role-row" key={item.id}>
-                <span>{item.roleName || t.role}</span>
-                <span>{item.time || '-'}</span>
-                <span>{personLabel(people, item.personType, item.personId) || t.pending}</span>
-              </div>
-            ))}
+          <p className="tm-agenda-purpose">宗旨：提供会友交流切磋机会；在友好和谐气氛中掌握演讲技巧、学习领导技能、培养自信并提升个人修养。</p>
+          <div className="tm-agenda-bar">主要议程</div>
+          <table className="tm-agenda-table">
+            <colgroup>
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '54%' }} />
+              <col style={{ width: '24%' }} />
+              <col style={{ width: '10%' }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>摘要 / 题目</th>
+                <th>负责人</th>
+                <th>时限</th>
+              </tr>
+            </thead>
+            <tbody>
+              {agendaSchedule.map((item, index) => (
+                <tr key={item.id}>
+                  <td className="time">{item.time}</td>
+                  <td>{item.summary}</td>
+                  <td className="person">{item.person || t.pending}</td>
+                  <td className="duration">{item.duration}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="tm-agenda-footer">
+            <span>{t.club}</span>
+            <span>{data.meeting.number || t.currentMeeting}例常活动议程表</span>
+            <span>{data.meeting.closeTime ? `预计结束：${data.meeting.closeTime}` : ''}</span>
           </div>
-          <div className="tm-agenda-summary">
-            <div>
-              <h3>{t.preparedSpeakers}</h3>
-              {data.prepared.map(item => <p key={item.id}><b>{item.name || t.pending}</b>{item.title ? ` - ${item.title}` : ''}</p>)}
+          {(data.prepared.length || data.impromptu.length || data.evaluator.length) ? (
+            <div className="tm-agenda-mini-summary">
+              <div><b>{t.preparedSpeakers}</b>{data.prepared.map(item => <span key={item.id}>{item.name || t.pending}{item.title ? `｜${item.title}` : ''}</span>)}</div>
+              <div><b>{t.tableTopics}</b>{data.impromptu.map(item => <span key={item.id}>{item.name || t.pending}</span>)}</div>
+              <div><b>{t.evaluators}</b>{data.evaluator.map(item => <span key={item.id}>{item.name || t.pending}</span>)}</div>
             </div>
-            <div>
-              <h3>{t.tableTopics}</h3>
-              {data.impromptu.map(item => <p key={item.id}>{item.name || t.pending}</p>)}
-            </div>
-            <div>
-              <h3>{t.evaluators}</h3>
-              {data.evaluator.map(item => <p key={item.id}>{item.name || t.pending}</p>)}
-            </div>
-          </div>
+          ) : null}
         </div>
       </section>
     </div>
