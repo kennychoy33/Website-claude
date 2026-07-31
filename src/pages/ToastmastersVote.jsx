@@ -10,6 +10,7 @@ import {
   hasLocalVote,
   isCloudConfigured,
   loadMeetingOpsState,
+  loadMeetingRecordsState,
   loadPeopleState,
   loadLocalState,
   loadRuntimeCloudConfig,
@@ -236,6 +237,11 @@ const LANG = {
     selectRecord: '查看旧记录',
     recordLockedNote: '旧记录只能查看，不能删除。收藏超过 7 天后不允许修改。',
     importAgenda: '导入例会表 / Excel',
+    pasteAgenda: '粘贴例会表文字',
+    pasteAgendaHint: '把含有职务和会员/嘉宾名字的例会表文字贴在这里，系统会自动匹配资料库姓名并填入职务。',
+    applyImport: '套用导入',
+    cancel: '取消',
+    importApplied: '例会表已导入',
     exportExcel: '导出 Excel',
     templateReady: '已上传模板',
   },
@@ -413,6 +419,11 @@ const LANG = {
     selectRecord: 'View Past Record',
     recordLockedNote: 'Past records are view-only and cannot be deleted. Saved records lock after 7 days.',
     importAgenda: 'Import Agenda / Excel',
+    pasteAgenda: 'Paste Agenda Text',
+    pasteAgendaHint: 'Paste agenda text with role names and member or guest names. The system will match names from your directory and fill roles automatically.',
+    applyImport: 'Apply Import',
+    cancel: 'Cancel',
+    importApplied: 'Agenda text imported',
     exportExcel: 'Export Excel',
     templateReady: 'Template uploaded',
   },
@@ -1628,6 +1639,74 @@ function isRecordLocked(record) {
   return Date.now() - savedTime > 7 * 24 * 60 * 60 * 1000
 }
 
+function normalizeAgendaText(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[：:|,，()（）\[\]【】]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function findPersonInText(text, people) {
+  const normalized = normalizeAgendaText(text)
+  const rows = [
+    ...people.members.map(item => ({ ...item, personType: 'member' })),
+    ...people.guests.map(item => ({ ...item, personType: 'guest' })),
+  ]
+  return rows
+    .filter(item => item.name)
+    .sort((a, b) => String(b.name).length - String(a.name).length)
+    .find(item => {
+      const names = [item.name, item.englishName].filter(Boolean).map(normalizeAgendaText)
+      return names.some(name => name && normalized.includes(name))
+    })
+}
+
+function roleAliases(roleName = '') {
+  const lower = roleName.toLowerCase()
+  const aliases = [roleName]
+  if (lower.includes('toastmaster of the evening')) aliases.push('toastmaster', 'tme', '主持人')
+  if (lower.includes('sergeant')) aliases.push('sergeant at arms', 'saa', '纪律官')
+  if (lower.includes('timer')) aliases.push('timer', '计时员')
+  if (lower.includes('ah counter')) aliases.push('ah counter', '哼哈官')
+  if (lower.includes('grammarian')) aliases.push('grammarian', '语法官')
+  if (lower.includes('general evaluator')) aliases.push('general evaluator', '总评估')
+  if (/^prepared speaker/i.test(roleName)) aliases.push('prepared speaker', '备稿讲员', '演讲')
+  if (/^evaluator/i.test(roleName)) aliases.push('evaluator', '评估员', '讲评')
+  if (/table topics master/i.test(roleName)) aliases.push('table topics master', '即席主持')
+  if (/table topics speaker/i.test(roleName)) aliases.push('table topics speaker', '即席讲员')
+  return aliases.map(normalizeAgendaText).filter(Boolean)
+}
+
+function importAgendaTextToRoles(text, roles, people) {
+  const lines = String(text || '')
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+  if (!lines.length) return roles
+
+  const usedLineIndexes = new Set()
+  return roles.map(role => {
+    const aliases = roleAliases(role.roleName)
+    let matchedLineIndex = lines.findIndex((line, index) => {
+      if (usedLineIndexes.has(index)) return false
+      const normalized = normalizeAgendaText(line)
+      return normalizeAgendaText(role.roleName) && normalized.includes(normalizeAgendaText(role.roleName))
+    })
+    if (matchedLineIndex < 0) matchedLineIndex = lines.findIndex((line, index) => {
+      if (usedLineIndexes.has(index)) return false
+      const normalized = normalizeAgendaText(line)
+      return aliases.some(alias => normalized.includes(alias)) && findPersonInText(line, people)
+    })
+    const searchText = matchedLineIndex >= 0
+      ? [lines[matchedLineIndex], lines[matchedLineIndex + 1] || ''].join(' ')
+      : lines.join(' ')
+    const person = matchedLineIndex >= 0 ? findPersonInText(searchText, people) : null
+    if (person) usedLineIndexes.add(matchedLineIndex)
+    return person ? { ...role, personType: person.personType, personId: person.id } : role
+  })
+}
+
 function MeetingView({ data, setData, persistState, people, meetingOps, setMeetingOps, persistMeetingOps, syncStatus, t, settings }) {
   const [records, setRecords] = useState(() => {
     try {
@@ -1638,6 +1717,8 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
   })
   const [selectedRecordId, setSelectedRecordId] = useState('current')
   const [meetingActionStatus, setMeetingActionStatus] = useState('')
+  const [agendaImportOpen, setAgendaImportOpen] = useState(false)
+  const [agendaImportText, setAgendaImportText] = useState('')
   const selectedRecord = records.find(record => record.id === selectedRecordId)
   const viewingOldRecord = selectedRecordId !== 'current'
   const locked = viewingOldRecord || isRecordLocked(selectedRecord)
@@ -1646,6 +1727,28 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
     ...people.members.map(item => ({ personType: 'member', personId: item.id, name: item.name })),
     ...people.guests.map(item => ({ personType: 'guest', personId: item.id, name: item.name })),
   ].filter(item => item.name)
+
+  useEffect(() => {
+    let ignore = false
+    async function hydrateRecords() {
+      try {
+        const cloudRecords = await loadMeetingRecordsState()
+        if (!ignore && cloudRecords.data.length) {
+          const localRecords = JSON.parse(localStorage.getItem(meetingRecordKey()) || '[]')
+          const merged = [
+            ...cloudRecords.data,
+            ...localRecords.filter(local => !cloudRecords.data.some(cloud => cloud.id === local.id)),
+          ]
+          setRecords(merged)
+          localStorage.setItem(meetingRecordKey(), JSON.stringify(merged))
+        }
+      } catch {
+        // Local records are already loaded; cloud history is an enhancement.
+      }
+    }
+    hydrateRecords()
+    return () => { ignore = true }
+  }, [data?.meeting?.id])
 
   function updateMeeting(field, value) {
     if (locked) return
@@ -1745,10 +1848,23 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
     }
   }
 
-  function importAgendaFile(event) {
-    const file = event.target.files?.[0]
-    if (!file) return
-    window.alert(`${t.importAgenda}: ${file.name}`)
+  async function applyAgendaImport() {
+    if (locked) return
+    const importedRoles = importAgendaTextToRoles(agendaImportText, meetingOps.roles, people)
+    const syncedData = candidatesFromMeetingRoles(importedRoles, people, data)
+    setMeetingOps({ ...meetingOps, roles: importedRoles })
+    setData(syncedData)
+    setAgendaImportOpen(false)
+    setAgendaImportText('')
+    setMeetingActionStatus(t.syncing)
+    try {
+      const savedData = await persistState(syncedData) || syncedData
+      setData(savedData)
+      await persistMeetingOps({ ...meetingOps, roles: importedRoles }, savedData.meeting?.id)
+      setMeetingActionStatus(t.importApplied)
+    } catch (err) {
+      setMeetingActionStatus(err.message || t.saveFailed)
+    }
   }
 
   function exportExcel() {
@@ -1830,10 +1946,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
         <div className="tm-actions">
           <button className="tm-gold" onClick={createMeeting}>{t.newMeeting}</button>
           <button onClick={editCurrent}>{t.editMeeting}</button>
-          <label className="tm-file-action">
-            {t.importAgenda}
-            <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv" onChange={importAgendaFile} />
-          </label>
+          <button onClick={() => setAgendaImportOpen(true)} disabled={locked}>{t.importAgenda}</button>
           <button onClick={exportExcel}>{t.exportExcel}</button>
           <button onClick={saveMeetingAll} disabled={locked}>{t.save}</button>
           <button onClick={addRole} disabled={locked}>{t.addRole}</button>
@@ -1841,6 +1954,25 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
           <button onClick={printAgenda}>{t.printAgenda}</button>
         </div>
       </div>
+
+      {agendaImportOpen && (
+        <div className="tm-modal-backdrop no-print">
+          <div className="tm-modal">
+            <h2>{t.pasteAgenda}</h2>
+            <p>{t.pasteAgendaHint}</p>
+            <textarea
+              value={agendaImportText}
+              onChange={event => setAgendaImportText(event.target.value)}
+              rows={12}
+              placeholder={`Toastmaster of the Evening: Kenny\nTimer: Jenny\nPrepared Speaker 1: 徐子淳`}
+            />
+            <div className="tm-modal-actions">
+              <button className="tm-gold" onClick={applyAgendaImport} disabled={!agendaImportText.trim()}>{t.applyImport}</button>
+              <button onClick={() => setAgendaImportOpen(false)}>{t.cancel}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className="tm-panel no-print">
         <div className="tm-panel-title">
@@ -2107,7 +2239,7 @@ export default function ToastmastersVote() {
   const workspaceId = user?.id || publicSpace || (isCloudConfigured ? getRememberedWorkspaceId() : getLocalWorkspaceId())
   const effectiveVoteLink = publicView
     ? window.location.href
-    : getPublicVoteUrl(workspaceId, selectedClubId)
+    : data?.meeting?.link || getPublicVoteUrl(workspaceId, selectedClubId, data?.meeting?.id || '')
 
   useEffect(() => {
     setActiveClubId(selectedClubId)

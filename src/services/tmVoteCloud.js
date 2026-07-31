@@ -179,13 +179,14 @@ export async function signOutUser() {
   if (error) throw error
 }
 
-export function getPublicVoteUrl(spaceId = '', clubId = getActiveClubId()) {
+export function getPublicVoteUrl(spaceId = '', clubId = getActiveClubId(), meetingId = '') {
   const basePath = import.meta.env.BASE_URL || '/'
   const url = new URL(`${basePath.replace(/\/$/, '')}/tm-vote`, window.location.origin)
   const activeSpace = spaceId || getRememberedWorkspaceId() || getLocalWorkspaceId()
   url.searchParams.set('view', 'vote')
   url.searchParams.set('space', activeSpace)
   url.searchParams.set('club', clubId || 'default')
+  if (meetingId) url.searchParams.set('meeting', meetingId)
   if (!envCloudConfig.url && !envCloudConfig.anonKey && activeCloudConfig.url && activeCloudConfig.anonKey) {
     url.searchParams.set('cfg', encodeCloudConfig(activeCloudConfig))
   }
@@ -693,7 +694,7 @@ function normalizeMeetingIdForOwner(meetingId, ownerId) {
   const rawId = `${meetingId || ''}`
   if (!rawId) return getMeetingId(ownerId)
   if (rawId.startsWith(`${ownerId}-`)) return rawId
-  if (rawId === TM_VOTE_MEETING_ID || /^\d+$/.test(rawId)) return getMeetingId(ownerId)
+  if (rawId === TM_VOTE_MEETING_ID) return getMeetingId(ownerId)
   return rawId
 }
 
@@ -721,7 +722,7 @@ async function ensureMeetingRowForOps(meetingId, ownerId) {
   })
 }
 
-export async function loadVoteState(spaceId = '', clubId = getActiveClubId()) {
+export async function loadVoteState(spaceId = '', clubId = getActiveClubId(), explicitMeetingId = '') {
   if (!isCloudConfigured) {
     return { data: loadLocalState(), source: 'local' }
   }
@@ -731,7 +732,20 @@ export async function loadVoteState(spaceId = '', clubId = getActiveClubId()) {
   if (!activeSpace) {
     return { data: loadLocalState(), source: 'local' }
   }
-  const meetingId = getMeetingId(activeSpace, clubId)
+  const urlMeetingId = new URLSearchParams(window.location.search).get('meeting') || ''
+  let meetingId = explicitMeetingId || urlMeetingId || getMeetingId(activeSpace, clubId)
+  if (!explicitMeetingId && !urlMeetingId && user && !spaceId) {
+    const { data: latestMeeting, error: latestMeetingError } = await supabase
+      .from('tm_meetings')
+      .select('id')
+      .eq('owner_id', user.id)
+      .eq('club_id', clubId || 'default')
+      .order('meeting_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (!latestMeetingError && latestMeeting?.id) meetingId = latestMeeting.id
+  }
 
   const readClient = publicSupabase || supabase
   const { data: meeting, error: meetingError } = await readClient
@@ -753,7 +767,7 @@ export async function loadVoteState(spaceId = '', clubId = getActiveClubId()) {
             number: '',
             theme: '',
             status: 'draft',
-            link: getPublicVoteUrl(activeSpace, clubId),
+            link: getPublicVoteUrl(activeSpace, clubId, meetingId),
           },
           prepared: [],
           impromptu: [],
@@ -785,7 +799,7 @@ export async function loadVoteState(spaceId = '', clubId = getActiveClubId()) {
 
   return {
     data: {
-      meeting: { ...fromMeetingRow(meeting), link: meeting.public_link || getPublicVoteUrl(activeSpace, clubId) },
+      meeting: { ...fromMeetingRow(meeting), link: meeting.public_link || getPublicVoteUrl(activeSpace, clubId, meeting.id) },
       prepared: candidates.filter(item => item.category === 'prepared').map(fromCandidateRow),
       impromptu: candidates.filter(item => item.category === 'impromptu').map(fromCandidateRow),
       evaluator: candidates.filter(item => item.category === 'evaluator').map(fromCandidateRow),
@@ -808,8 +822,8 @@ export async function saveVoteState(state) {
   }
 
   rememberWorkspaceId(user.id)
-  const meetingId = getMeetingId(user.id)
-  const meeting = { ...state.meeting, id: meetingId, link: getPublicVoteUrl(user.id, getActiveClubId()) }
+  const meetingId = normalizeMeetingIdForOwner(state.meeting?.id, user.id)
+  const meeting = { ...state.meeting, id: meetingId, link: getPublicVoteUrl(user.id, getActiveClubId(), meetingId) }
   const meetingRow = toMeetingRow(meeting, meetingId, user.id)
   const candidateRows = [
     ...state.prepared.map((item, index) => toCandidateRow(item, meetingId, 'prepared', index)),
@@ -829,6 +843,37 @@ export async function saveVoteState(state) {
     },
     source: 'cloud',
   }
+}
+
+export async function loadMeetingRecordsState() {
+  if (!isCloudConfigured) return { data: [], source: 'local' }
+  const user = await getCurrentUser()
+  if (!user) return { data: [], source: 'local' }
+
+  const { data: meetings, error } = await supabase
+    .from('tm_meetings')
+    .select('*')
+    .eq('owner_id', user.id)
+    .eq('club_id', getActiveClubRowId())
+    .order('meeting_date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(50)
+
+  if (error) throw error
+
+  const records = []
+  for (const meeting of meetings || []) {
+    const stateResult = await loadVoteState('', getActiveClubId(), meeting.id)
+    const opsResult = await loadMeetingOpsState(meeting.id)
+    records.push({
+      id: meeting.id,
+      savedAt: meeting.created_at || new Date().toISOString(),
+      data: stateResult.data,
+      meetingOps: opsResult.data,
+    })
+  }
+
+  return { data: records, source: 'cloud' }
 }
 
 async function saveVoteSetupWithSchemaFallback(meetingRow, candidateRows) {
