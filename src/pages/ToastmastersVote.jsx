@@ -2128,15 +2128,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
       </section>
 
       <section className="tm-agenda-print">
-        {settings.agendaTemplateDataUrl?.startsWith('data:image') && (
-          <img className="tm-template-background" src={settings.agendaTemplateDataUrl} alt={settings.agendaTemplateName || t.agendaTemplate} />
-        )}
-        {settings.agendaTemplateDataUrl?.startsWith('data:application/pdf') && (
-          <div className="tm-template-print">
-              <embed src={settings.agendaTemplateDataUrl} type="application/pdf" />
-          </div>
-        )}
-        <div className={settings.agendaTemplateDataUrl?.startsWith('data:image') ? 'tm-agenda-content on-template' : 'tm-agenda-content'}>
+        <div className="tm-agenda-content">
           <header className={settings.agendaTemplateDataUrl ? 'has-template' : ''}>
             {settings.logoDataUrl && <img className="tm-agenda-logo" src={settings.logoDataUrl} alt={t.clubShort} />}
             <h1>{t.club}</h1>
