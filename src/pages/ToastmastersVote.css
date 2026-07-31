@@ -1296,6 +1296,15 @@
   color: var(--tm-ink);
 }
 
+.tm-agenda-print::before {
+  content: "";
+  position: absolute;
+  inset: 16px;
+  border: 2px solid var(--tm-navy);
+  pointer-events: none;
+  opacity: .12;
+}
+
 .tm-agenda-content {
   position: relative;
   z-index: 1;
@@ -1303,9 +1312,9 @@
 
 .tm-agenda-print header {
   text-align: center;
-  border-bottom: 2px solid var(--tm-navy);
-  margin-bottom: 20px;
-  padding-bottom: 16px;
+  border-bottom: 3px double var(--tm-navy);
+  margin-bottom: 12px;
+  padding-bottom: 12px;
 }
 
 .tm-agenda-print h1 {
@@ -1327,36 +1336,52 @@
   color: var(--tm-burgundy);
 }
 
+.tm-agenda-print header p {
+  margin: 6px 0 0;
+  font-weight: 900;
+  color: var(--tm-muted);
+}
+
 .tm-agenda-print h3 {
   color: var(--tm-navy);
-  border-bottom: 1px solid var(--tm-line);
-  padding-bottom: 8px;
+  border-bottom: 2px solid var(--tm-navy);
+  padding-bottom: 6px;
+  margin: 0 0 8px;
+  font-size: 15px;
 }
 
 .tm-agenda-meta {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 0;
+  margin-bottom: 12px;
+  border: 1px solid var(--tm-navy);
+  border-bottom: 0;
 }
 
 .tm-agenda-meta span {
-  border: 1px solid var(--tm-line);
-  border-radius: 6px;
-  padding: 8px 10px;
+  border: 0;
+  border-right: 1px solid var(--tm-navy);
+  border-bottom: 1px solid var(--tm-navy);
+  border-radius: 0;
+  padding: 7px 9px;
   font-weight: 800;
+}
+
+.tm-agenda-meta span:last-child {
+  border-right: 0;
 }
 
 .tm-agenda-meta b {
   display: block;
-  color: var(--tm-muted);
+  color: var(--tm-navy);
   font-size: 12px;
   margin-bottom: 4px;
 }
 
 .tm-print-role-table {
-  border: 1px solid var(--tm-line);
-  border-radius: 8px;
+  border: 1px solid var(--tm-navy);
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -1367,17 +1392,21 @@
 }
 
 .tm-print-role-head span {
-  background: #edf3fa;
-  color: var(--tm-muted);
+  background: var(--tm-navy);
+  color: white;
   font-weight: 900;
 }
 
 .tm-print-role-head span,
 .tm-print-role-row span {
-  padding: 9px 10px;
-  border-right: 1px solid var(--tm-line);
+  padding: 7px 9px;
+  border-right: 1px solid var(--tm-navy);
   border-bottom: 1px solid var(--tm-line);
   font-weight: 800;
+}
+
+.tm-print-role-row:nth-child(odd) span {
+  background: #f7fafc;
 }
 
 .tm-print-role-head span:last-child,
@@ -1388,13 +1417,23 @@
 .tm-agenda-summary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-  margin-top: 18px;
+  gap: 0;
+  margin-top: 12px;
+  border: 1px solid var(--tm-navy);
 }
 
 .tm-agenda-summary p {
-  margin: 8px 0;
+  margin: 6px 0;
   font-weight: 700;
+}
+
+.tm-agenda-summary > div {
+  padding: 10px;
+  border-right: 1px solid var(--tm-navy);
+}
+
+.tm-agenda-summary > div:last-child {
+  border-right: 0;
 }
 
 @media (max-width: 980px) {
@@ -1542,8 +1581,15 @@
     border: 0;
     border-radius: 0;
     box-shadow: none;
-    padding: 12mm;
-    font-size: 10.5pt;
+    padding: 8mm;
+    font-size: 9.6pt;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .tm-agenda-print::before {
+    inset: 4mm;
+    border-width: .6mm;
   }
 
   .tm-agenda-content {
@@ -1552,8 +1598,8 @@
   }
 
   .tm-agenda-print header {
-    margin-bottom: 5mm;
-    padding-bottom: 4mm;
+    margin-bottom: 3mm;
+    padding-bottom: 3mm;
   }
 
   .tm-agenda-print header.has-template {
@@ -1561,37 +1607,55 @@
   }
 
   .tm-agenda-print h1 {
-    font-size: 20pt;
+    font-size: 18pt;
   }
 
   .tm-agenda-print h2 {
-    font-size: 15pt;
+    font-size: 13pt;
+    margin: 2mm 0;
   }
 
   .tm-agenda-meta {
     grid-template-columns: repeat(4, 1fr);
-    gap: 2.5mm;
-    margin-bottom: 4mm;
+    gap: 0;
+    margin-bottom: 3mm;
   }
 
   .tm-agenda-meta span {
-    padding: 2.2mm 2.5mm;
+    padding: 1.7mm 2mm;
+  }
+
+  .tm-agenda-meta b {
+    font-size: 8pt;
   }
 
   .tm-print-role-head,
   .tm-print-role-row {
-    grid-template-columns: 1.45fr 22mm 1.2fr;
+    grid-template-columns: 1.55fr 18mm 1.15fr;
   }
 
   .tm-print-role-head span,
   .tm-print-role-row span {
-    padding: 2.4mm 2.6mm;
+    padding: 1.55mm 2mm;
   }
 
   .tm-agenda-summary {
     grid-template-columns: repeat(3, 1fr);
-    gap: 5mm;
-    margin-top: 5mm;
+    gap: 0;
+    margin-top: 3mm;
+  }
+
+  .tm-agenda-summary > div {
+    padding: 2.2mm;
+  }
+
+  .tm-agenda-print h3 {
+    font-size: 10.5pt;
+    padding-bottom: 1.5mm;
+  }
+
+  .tm-agenda-summary p {
+    margin: 1.2mm 0;
   }
 
   .no-print {
