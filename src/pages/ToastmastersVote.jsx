@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
 import {
   getOrCreateVoterToken,
@@ -1636,7 +1636,8 @@ function minutesFromRoleTime(value = '') {
 function formatAgendaTime(totalMinutes) {
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
-  return `${hours}:${String(minutes).padStart(2, '0')}`
+  const hour12 = hours > 12 ? hours - 12 : hours
+  return `${hour12}:${String(minutes).padStart(2, '0')}PM`
 }
 
 function agendaRoleSummary(role, people, data) {
@@ -1670,6 +1671,7 @@ function agendaScheduleRows(rows, people, data) {
     const duration = minutesFromRoleTime(role.time)
     const item = {
       id: role.id || `${role.roleName}-${index}`,
+      roleName: role.roleName || '',
       time: formatAgendaTime(current),
       summary: agendaRoleSummary(role, people, data),
       person: personLabel(people, role.personType, role.personId),
@@ -1678,6 +1680,13 @@ function agendaScheduleRows(rows, people, data) {
     current += duration
     return item
   })
+}
+
+function agendaSectionLabel(item = {}) {
+  const roleName = item.roleName || ''
+  if (/prepared speaker 1/i.test(roleName)) return '演说环节'
+  if (/^evaluator 1/i.test(roleName)) return '评论（由总评论承接）'
+  return ''
 }
 
 function meetingRecordKey() {
@@ -1785,7 +1794,7 @@ function importAgendaTextToRoles(text, roles, people) {
   })
 }
 
-function MeetingView({ data, setData, persistState, people, meetingOps, setMeetingOps, persistMeetingOps, syncStatus, t, settings }) {
+function MeetingView({ data, setData, persistState, people, meetingOps, setMeetingOps, persistMeetingOps, syncStatus, t, settings, voteLink }) {
   const [records, setRecords] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(meetingRecordKey()) || '[]')
@@ -2182,63 +2191,87 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
 
       <section className="tm-agenda-print">
         <div className="tm-agenda-content">
-          <div className="tm-agenda-topline"></div>
-          <header className="tm-agenda-template-head">
-            <div className="tm-agenda-logo-box">
-              {settings.logoDataUrl && <img className="tm-agenda-logo" src={settings.logoDataUrl} alt={t.clubShort} />}
+          <div className="tm-agenda-motto">中爱吾会， 化雨春风， 齐展翅</div>
+          <div className="tm-agenda-frame">
+            <header className="tm-agenda-template-head">
+              <div className="tm-agenda-logo-box">
+                {settings.logoDataUrl && <img className="tm-agenda-logo" src={settings.logoDataUrl} alt={t.clubShort} />}
+              </div>
+              <div>
+                <h1>{t.club}</h1>
+                <h3>CHUNG HWA ALUMNI ASSOCIATION MANDARIN TOASTMASTERS CLUB</h3>
+                <p>国际讲演会注册编号：{settings.toastmasterId || 'CB-00003015'}　（102区域 M3分区）</p>
+              </div>
+              <div className="tm-agenda-logo-box right-mark">
+                <span>中华校友会</span>
+              </div>
+            </header>
+            <div className="tm-agenda-purpose">
+              <b>宗旨：</b>
+              <span>1. 提供会友一个互相交流与切磋的机会。</span>
+              <span>2. 让会友在友好与和谐的气氛中逐步掌握演讲技巧，学习领导技能，从而培养自信心提升个人修养。</span>
             </div>
-            <div>
-              <h1>{t.club}</h1>
-              <p>CHUNG HWA ALUMNI ASSOCIATION MANDARIN TOASTMASTERS CLUB</p>
+            <div className="tm-agenda-title-bar">
+              <strong>{data.meeting.number || t.currentMeeting}例常活动议程表</strong>
+              <span>{data.meeting.date || t.pending}</span>
             </div>
-            <div className="tm-agenda-club-id">{settings.toastmasterId || 'Toastmasters Club'}</div>
-          </header>
-          <h2 className="tm-agenda-title">{data.meeting.number || t.currentMeeting}例常活动议程表</h2>
-          <div className="tm-agenda-pills">
-            <span>{data.meeting.date || t.pending}</span>
-            <span>主题：{data.meeting.theme || t.pending}</span>
-            <span>每日一词：{data.meeting.word || t.pending}</span>
-          </div>
-          <p className="tm-agenda-purpose">宗旨：提供会友交流切磋机会；在友好和谐气氛中掌握演讲技巧、学习领导技能、培养自信并提升个人修养。</p>
-          <div className="tm-agenda-bar">主要议程</div>
-          <table className="tm-agenda-table">
-            <colgroup>
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '54%' }} />
-              <col style={{ width: '24%' }} />
-              <col style={{ width: '10%' }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>时间</th>
-                <th>摘要 / 题目</th>
-                <th>负责人</th>
-                <th>时限</th>
-              </tr>
-            </thead>
-            <tbody>
-              {agendaSchedule.map((item, index) => (
-                <tr key={item.id}>
-                  <td className="time">{item.time}</td>
-                  <td>{item.summary}</td>
-                  <td className="person">{item.person || t.pending}</td>
-                  <td className="duration">{item.duration}</td>
+            <div className="tm-agenda-topic-row">
+              <div>
+                <p>主题：{data.meeting.theme || t.pending}</p>
+                <p>每日一词：{data.meeting.word || t.pending}</p>
+              </div>
+              <div className="tm-agenda-qr-note">请扫这里签到和<br />投选最佳讲员</div>
+              <div className="tm-agenda-qr">
+                <QrBlock value={voteLink} compact />
+              </div>
+            </div>
+            <table className="tm-agenda-table">
+              <colgroup>
+                <col style={{ width: '10.5%' }} />
+                <col style={{ width: '38%' }} />
+                <col style={{ width: '23%' }} />
+                <col style={{ width: '10.5%' }} />
+                <col style={{ width: '18%' }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>摘要</th>
+                  <th>负责人</th>
+                  <th>时限</th>
+                  <th>备注</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="tm-agenda-footer">
-            <span>{t.club}</span>
-            <span>{data.meeting.number || t.currentMeeting}例常活动议程表</span>
-            <span>{data.meeting.closeTime ? `预计结束：${data.meeting.closeTime}` : ''}</span>
+              </thead>
+              <tbody>
+                {agendaSchedule.map((item, index) => (
+                  <Fragment key={item.id}>
+                    {agendaSectionLabel(item) && (
+                      <tr className="section"><td colSpan="5">{agendaSectionLabel(item)}</td></tr>
+                    )}
+                    <tr>
+                      <td className="time">{item.time}</td>
+                      <td>{item.summary}</td>
+                      <td className="person">{item.person || t.pending}</td>
+                      <td className="duration">{item.duration}</td>
+                      <td></td>
+                    </tr>
+                  </Fragment>
+                ))}
+                <tr className="night"><td>{data.meeting.closeTime || '10:00PM'}</td><td colSpan="4">晚安！</td></tr>
+              </tbody>
+            </table>
           </div>
-          {(data.prepared.length || data.impromptu.length || data.evaluator.length) ? (
-            <div className="tm-agenda-mini-summary">
-              <div><b>{t.preparedSpeakers}</b>{data.prepared.map(item => <span key={item.id}>{item.name || t.pending}{item.title ? `｜${item.title}` : ''}</span>)}</div>
-              <div><b>{t.tableTopics}</b>{data.impromptu.map(item => <span key={item.id}>{item.name || t.pending}</span>)}</div>
-              <div><b>{t.evaluators}</b>{data.evaluator.map(item => <span key={item.id}>{item.name || t.pending}</span>)}</div>
-            </div>
-          ) : null}
+          <div className="tm-agenda-footer">{t.club} · {data.meeting.number || t.currentMeeting}例常活动议程表</div>
+          <div className="tm-agenda-mini-summary">
+            <div><b>{t.preparedSpeakers}</b>{data.prepared.map(item => <span key={item.id}>{item.name || t.pending}{item.title ? `｜${item.title}` : ''}</span>)}</div>
+            <div><b>{t.tableTopics}</b>{data.impromptu.map(item => <span key={item.id}>{item.name || t.pending}</span>)}</div>
+            <div><b>{t.evaluators}</b>{data.evaluator.map(item => <span key={item.id}>{item.name || t.pending}</span>)}</div>
+          </div>
+          {false && (
+            <>
+              {settings.logoDataUrl && <img className="tm-agenda-logo" src={settings.logoDataUrl} alt={t.clubShort} />}
+            </>
+          )}
         </div>
       </section>
     </div>
@@ -2636,7 +2669,7 @@ export default function ToastmastersVote() {
         {view === 'master' && superAdmin && <MasterAdminView settings={settings} t={appText} onClubsChange={setManagedClubs} />}
         {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} meetingOps={meetingOps} spaceId={workspaceId} voteLink={effectiveVoteLink} />}
         {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={appText} />}
-        {view === 'meeting' && <MeetingView data={data} setData={setData} persistState={persistState} people={people} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={appText} settings={settings} />}
+        {view === 'meeting' && <MeetingView data={data} setData={setData} persistState={persistState} people={people} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={appText} settings={settings} voteLink={effectiveVoteLink} />}
         {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={appText} spaceId={workspaceId} />}
         {view === 'success' && <div className="tm-success-card"><h1>{appText.thankVote}</h1><p>{appText.recorded}</p></div>}
         {view === 'share' && <SharePoster data={data} t={appText} voteLink={effectiveVoteLink} />}
