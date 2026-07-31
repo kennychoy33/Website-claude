@@ -2207,9 +2207,8 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
               </div>
             </header>
             <div className="tm-agenda-purpose">
-              <b>宗旨：</b>
-              <span>1. 提供会友一个互相交流与切磋的机会。</span>
-              <span>2. 让会友在友好与和谐的气氛中逐步掌握演讲技巧，学习领导技能，从而培养自信心提升个人修养。</span>
+              <p><b>宗旨：</b>1. 提供会友一个互相交流与切磋的机会。</p>
+              <p>2. 让会友在友好与和谐的气氛中逐步掌握演讲技巧，学习领导技能，从而培养自信心提升个人修养。</p>
             </div>
             <div className="tm-agenda-title-bar">
               <strong>{data.meeting.number || t.currentMeeting}例常活动议程表</strong>
