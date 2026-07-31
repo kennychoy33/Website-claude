@@ -2096,55 +2096,54 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
       </section>
 
       <section className="tm-agenda-print">
-        {settings.agendaTemplateDataUrl && (
+        {settings.agendaTemplateDataUrl?.startsWith('data:image') && (
+          <img className="tm-template-background" src={settings.agendaTemplateDataUrl} alt={settings.agendaTemplateName || t.agendaTemplate} />
+        )}
+        {settings.agendaTemplateDataUrl?.startsWith('data:application/pdf') && (
           <div className="tm-template-print">
-            {settings.agendaTemplateDataUrl.startsWith('data:image') ? (
-              <img src={settings.agendaTemplateDataUrl} alt={settings.agendaTemplateName || t.agendaTemplate} />
-            ) : settings.agendaTemplateDataUrl.startsWith('data:application/pdf') ? (
               <embed src={settings.agendaTemplateDataUrl} type="application/pdf" />
-            ) : (
-              <p>{t.agendaTemplate}: {settings.agendaTemplateName}</p>
-            )}
           </div>
         )}
-        <header className={settings.agendaTemplateDataUrl ? 'has-template' : ''}>
-          {settings.logoDataUrl && <img className="tm-agenda-logo" src={settings.logoDataUrl} alt={t.clubShort} />}
-          <h1>{t.club}</h1>
-          <h2>{data.meeting.number} {t.regularMeeting}</h2>
-          <p>{data.meeting.date} | {data.meeting.theme} | {t.word}: {data.meeting.word}</p>
-        </header>
-        <div className="tm-agenda-meta">
-          <span><b>{t.meetingNo}</b>{data.meeting.number || t.pending}</span>
-          <span><b>{t.date}</b>{data.meeting.date || t.pending}</span>
-          <span><b>{t.theme}</b>{data.meeting.theme || t.pending}</span>
-          <span><b>{t.closeTime}</b>{data.meeting.closeTime || t.pending}</span>
-        </div>
-        <div className="tm-print-role-table">
-          <div className="tm-print-role-head">
-            <span>{t.role}</span>
-            <span>{t.roleTime}</span>
-            <span>{t.assignee}</span>
+        <div className={settings.agendaTemplateDataUrl?.startsWith('data:image') ? 'tm-agenda-content on-template' : 'tm-agenda-content'}>
+          <header className={settings.agendaTemplateDataUrl ? 'has-template' : ''}>
+            {settings.logoDataUrl && <img className="tm-agenda-logo" src={settings.logoDataUrl} alt={t.clubShort} />}
+            <h1>{t.club}</h1>
+            <h2>{data.meeting.number} {t.regularMeeting}</h2>
+            <p>{data.meeting.date} | {data.meeting.theme} | {t.word}: {data.meeting.word}</p>
+          </header>
+          <div className="tm-agenda-meta">
+            <span><b>{t.meetingNo}</b>{data.meeting.number || t.pending}</span>
+            <span><b>{t.date}</b>{data.meeting.date || t.pending}</span>
+            <span><b>{t.theme}</b>{data.meeting.theme || t.pending}</span>
+            <span><b>{t.closeTime}</b>{data.meeting.closeTime || t.pending}</span>
           </div>
-          {agendaPrintRows.map(item => (
-            <div className="tm-print-role-row" key={item.id}>
-              <span>{item.roleName || t.role}</span>
-              <span>{item.time || '-'}</span>
-              <span>{personLabel(people, item.personType, item.personId) || t.pending}</span>
+          <div className="tm-print-role-table">
+            <div className="tm-print-role-head">
+              <span>{t.role}</span>
+              <span>{t.roleTime}</span>
+              <span>{t.assignee}</span>
             </div>
-          ))}
-        </div>
-        <div className="tm-agenda-summary">
-          <div>
-            <h3>{t.preparedSpeakers}</h3>
-            {data.prepared.map(item => <p key={item.id}><b>{item.name || t.pending}</b>{item.title ? ` - ${item.title}` : ''}</p>)}
+            {agendaPrintRows.map(item => (
+              <div className="tm-print-role-row" key={item.id}>
+                <span>{item.roleName || t.role}</span>
+                <span>{item.time || '-'}</span>
+                <span>{personLabel(people, item.personType, item.personId) || t.pending}</span>
+              </div>
+            ))}
           </div>
-          <div>
-            <h3>{t.tableTopics}</h3>
-            {data.impromptu.map(item => <p key={item.id}>{item.name || t.pending}</p>)}
-          </div>
-          <div>
-            <h3>{t.evaluators}</h3>
-            {data.evaluator.map(item => <p key={item.id}>{item.name || t.pending}</p>)}
+          <div className="tm-agenda-summary">
+            <div>
+              <h3>{t.preparedSpeakers}</h3>
+              {data.prepared.map(item => <p key={item.id}><b>{item.name || t.pending}</b>{item.title ? ` - ${item.title}` : ''}</p>)}
+            </div>
+            <div>
+              <h3>{t.tableTopics}</h3>
+              {data.impromptu.map(item => <p key={item.id}>{item.name || t.pending}</p>)}
+            </div>
+            <div>
+              <h3>{t.evaluators}</h3>
+              {data.evaluator.map(item => <p key={item.id}>{item.name || t.pending}</p>)}
+            </div>
           </div>
         </div>
       </section>
