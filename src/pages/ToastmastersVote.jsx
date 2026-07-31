@@ -1749,6 +1749,71 @@ function agendaScheduleRows(rows, people, data) {
   })
 }
 
+function standardAgendaScheduleRows(rows, people, data) {
+  const byKey = new Map(rows.map(role => [canonicalAgendaRoleKey(role.roleName), role]))
+  const rowFor = (key, summary, duration, personKey = key, source = null) => {
+    const role = source || byKey.get(personKey) || byKey.get(key) || {}
+    return {
+      id: `${key}-${summary}`,
+      roleName: role.roleName || key,
+      summary,
+      person: personLabel(people, role.personType, role.personId),
+      duration,
+    }
+  }
+  const preparedRows = ['prepared-1', 'prepared-2', 'prepared-3', 'prepared-4']
+    .map(key => byKey.get(key))
+    .filter(Boolean)
+    .map(role => rowFor(canonicalAgendaRoleKey(role.roleName), agendaRoleSummary(role, people, data), role.time || '7', canonicalAgendaRoleKey(role.roleName), role))
+  const topicRows = ['topics-1', 'topics-2', 'topics-3', 'topics-4']
+    .map(key => byKey.get(key))
+    .filter(Boolean)
+    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), `即席讲员 ${index + 1}`, role.time || '2', canonicalAgendaRoleKey(role.roleName), role))
+  const evaluatorRows = ['evaluator-1', 'evaluator-2', 'evaluator-3', 'evaluator-4']
+    .map(key => byKey.get(key))
+    .filter(Boolean)
+    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), `评论 ${index + 1}`, role.time || '3', canonicalAgendaRoleKey(role.roleName), role))
+  const timerRole = byKey.get('timer')
+  const toastmasterRole = byKey.get('toastmaster')
+  const presidentRole = byKey.get('president')
+
+  const flow = [
+    rowFor('sergeant', '礼宾司致欢迎词', '3'),
+    rowFor('president', '会长致开会词', '5'),
+    rowFor('toastmaster', '司仪介绍节目流程', '8-10'),
+    rowFor('timer', '计时员说明时间规则', '3'),
+    rowFor('ah-counter', '尾音计算员说明规则', '3'),
+    rowFor('grammarian', '语言评论员介绍每日一词', '5'),
+    { section: '演说环节' },
+    ...preparedRows,
+    rowFor('timer-report-1', '计时报告', '1', 'timer', timerRole),
+    rowFor('topics-master', '即席演讲环节【每位讲员1至2分钟】', byKey.get('topics-master')?.time || '10', 'topics-master'),
+    ...topicRows,
+    rowFor('timer-report-2', '计时报告', '1', 'timer', timerRole),
+    rowFor('photo', '大合照', '1', 'president', presidentRole),
+    rowFor('break', '交流时间', '6', 'toastmaster', toastmasterRole),
+    { section: '评论（由总评论承接）' },
+    ...evaluatorRows,
+    rowFor('topics-evaluation', '即席评论', '3-5', 'general-evaluator'),
+    rowFor('timer-report-3', '计时报告', '1', 'timer', timerRole),
+    rowFor('vote', '投票环节', '1', 'toastmaster', toastmasterRole),
+    rowFor('grammarian-report', '语言评论', '3-5', 'grammarian'),
+    rowFor('ah-counter-report', '尾音计算报告', '2-3', 'ah-counter'),
+    rowFor('general-evaluator', '总评论', byKey.get('general-evaluator')?.time || '8-10', 'general-evaluator'),
+    rowFor('awards', '表扬最佳表现', '5', 'toastmaster', toastmasterRole),
+    rowFor('exco-report', '执委及事项报告', '3', 'toastmaster', toastmasterRole),
+    rowFor('president-closing', '会长致休会词', '3-5', 'president', presidentRole),
+  ]
+  let current = 19 * 60 + 15
+  return flow.map((item, index) => {
+    if (item.section) return { id: `section-${index}`, section: item.section }
+    const duration = minutesFromRoleTime(item.duration)
+    const next = { ...item, time: formatAgendaTime(current) }
+    current += duration
+    return next
+  })
+}
+
 function agendaSectionLabel(item = {}) {
   const roleName = item.roleName || ''
   if (/prepared speaker 1/i.test(roleName)) return '演说环节'
@@ -2068,7 +2133,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
   }
 
   const agendaPrintRows = agendaRowsFromTemplate(settings, meetingOps.roles)
-  const agendaSchedule = agendaScheduleRows(agendaPrintRows, people, data)
+  const agendaSchedule = standardAgendaScheduleRows(agendaPrintRows, people, data)
 
   function printAgenda() {
     setMeetingActionStatus(t.printAgenda)
@@ -2311,16 +2376,17 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
               <tbody>
                 {agendaSchedule.map((item, index) => (
                   <Fragment key={item.id}>
-                    {agendaSectionLabel(item) && (
-                      <tr className="section"><td colSpan="5">{agendaSectionLabel(item)}</td></tr>
+                    {item.section ? (
+                      <tr className="section"><td colSpan="5">{item.section}</td></tr>
+                    ) : (
+                      <tr>
+                        <td className="time">{item.time}</td>
+                        <td>{item.summary}</td>
+                        <td className="person">{item.person || t.pending}</td>
+                        <td className="duration">{item.duration}</td>
+                        <td></td>
+                      </tr>
                     )}
-                    <tr>
-                      <td className="time">{item.time}</td>
-                      <td>{item.summary}</td>
-                      <td className="person">{item.person || t.pending}</td>
-                      <td className="duration">{item.duration}</td>
-                      <td></td>
-                    </tr>
                   </Fragment>
                 ))}
                 <tr className="night"><td>{data.meeting.closeTime || '10:00PM'}</td><td colSpan="4">晚安！</td></tr>
