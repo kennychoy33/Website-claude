@@ -1637,6 +1637,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
     }
   })
   const [selectedRecordId, setSelectedRecordId] = useState('current')
+  const [meetingActionStatus, setMeetingActionStatus] = useState('')
   const selectedRecord = records.find(record => record.id === selectedRecordId)
   const viewingOldRecord = selectedRecordId !== 'current'
   const locked = viewingOldRecord || isRecordLocked(selectedRecord)
@@ -1692,6 +1693,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
 
   async function resetRolesFromTemplate() {
     if (locked) return
+    setMeetingActionStatus(t.syncing)
     const roles = fullToastmastersRoles(settings)
     const syncedData = candidatesFromMeetingRoles(roles, people, data)
     setMeetingOps({ ...meetingOps, roles })
@@ -1700,12 +1702,13 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
       const savedData = await persistState(syncedData) || syncedData
       setData(savedData)
       await persistMeetingOps({ ...meetingOps, roles }, savedData.meeting?.id)
-    } catch {
-      // Persist errors are already surfaced through syncStatus.
+      setMeetingActionStatus(t.meetingSaved)
+    } catch (err) {
+      setMeetingActionStatus(err.message || t.saveFailed)
     }
   }
 
-  function createMeeting() {
+  async function createMeeting() {
     setSelectedRecordId('current')
     const roles = fullToastmastersRoles(settings)
     const currentNumber = String(data.meeting.number || '').match(/\d+/)?.[0]
@@ -1731,6 +1734,15 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
       attendance: [],
       roles,
     })
+    setMeetingActionStatus(t.syncing)
+    try {
+      const savedData = await persistState(next) || next
+      setData(savedData)
+      await persistMeetingOps({ attendance: [], roles }, savedData.meeting?.id)
+      setMeetingActionStatus(t.meetingSaved)
+    } catch (err) {
+      setMeetingActionStatus(err.message || t.saveFailed)
+    }
   }
 
   function importAgendaFile(event) {
@@ -1759,27 +1771,38 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
 
   async function saveMeetingAll() {
     if (locked) return
+    setMeetingActionStatus(t.syncing)
     const syncedData = candidatesFromMeetingRoles(meetingOps.roles, people, data)
-    const savedData = await persistState(syncedData) || syncedData
-    const activeMeetingId = savedData.meeting?.id || syncedData.meeting.id
-    setData(savedData)
-    await persistMeetingOps(meetingOps, activeMeetingId)
-    const record = {
-      id: activeMeetingId || `${Date.now()}`,
-      savedAt: new Date().toISOString(),
-      data: savedData,
-      meetingOps,
+    try {
+      const savedData = await persistState(syncedData) || syncedData
+      const activeMeetingId = savedData.meeting?.id || syncedData.meeting.id
+      setData(savedData)
+      await persistMeetingOps(meetingOps, activeMeetingId)
+      const record = {
+        id: activeMeetingId || `${Date.now()}`,
+        savedAt: new Date().toISOString(),
+        data: savedData,
+        meetingOps,
+      }
+      const nextRecords = [
+        record,
+        ...records.filter(item => item.id !== record.id),
+      ]
+      setRecords(nextRecords)
+      localStorage.setItem(meetingRecordKey(), JSON.stringify(nextRecords))
+      setSelectedRecordId('current')
+      setMeetingActionStatus(t.meetingSaved)
+    } catch (err) {
+      setMeetingActionStatus(err.message || t.saveFailed)
     }
-    const nextRecords = [
-      record,
-      ...records.filter(item => item.id !== record.id),
-    ]
-    setRecords(nextRecords)
-    localStorage.setItem(meetingRecordKey(), JSON.stringify(nextRecords))
-    setSelectedRecordId('current')
   }
 
   const agendaPrintRows = agendaRowsFromTemplate(settings, meetingOps.roles)
+
+  function printAgenda() {
+    setMeetingActionStatus(t.printAgenda)
+    requestAnimationFrame(() => window.print())
+  }
 
   function selectRecord(id) {
     setSelectedRecordId(id)
@@ -1802,6 +1825,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
           <p>{data.meeting.number || t.currentMeeting} {t.regularMeeting} | {data.meeting.date}</p>
           <p className="tm-lock-note">{locked ? t.lockedMeeting : t.editableMeeting} · {t.recordLockedNote}</p>
           {syncStatus && <div className="tm-sync-badge"><b>{syncStatus}</b></div>}
+          {meetingActionStatus && <div className="tm-sync-badge"><b>{meetingActionStatus}</b></div>}
         </div>
         <div className="tm-actions">
           <button className="tm-gold" onClick={createMeeting}>{t.newMeeting}</button>
@@ -1814,7 +1838,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
           <button onClick={saveMeetingAll} disabled={locked}>{t.save}</button>
           <button onClick={addRole} disabled={locked}>{t.addRole}</button>
           <button onClick={resetRolesFromTemplate} disabled={locked}>{t.resetRoles}</button>
-          <button onClick={() => window.print()}>{t.printAgenda}</button>
+          <button onClick={printAgenda}>{t.printAgenda}</button>
         </div>
       </div>
 
