@@ -1610,14 +1610,28 @@ function candidatesFromMeetingRoles(roles, people, existingData) {
 
 function agendaRowsFromTemplate(settings, roles = []) {
   const nonRolePattern = /invocation|pledge|guest introduction|word of the day|timer report|ah counter report|grammarian report|awards presentation|president closing/i
+  const roleMap = new Map()
+  ;(roles || []).forEach(role => {
+    const key = canonicalAgendaRoleKey(role.roleName)
+    if (key && !roleMap.has(key)) roleMap.set(key, role)
+  })
   const template = (settings.agendaRoleTemplate || [])
     .filter(Boolean)
     .map(role => (typeof role === 'string' ? { roleName: role, time: '' } : role))
     .filter(role => !nonRolePattern.test(role.roleName || ''))
-  const roleMap = new Map((roles || []).map(role => [role.roleName, role]))
   const source = template.length ? template : roles
-  return source.map((templateRole, index) => {
-    const assignedRole = roleMap.get(templateRole.roleName) || roles[index] || {}
+  const seen = new Set()
+  return source
+    .map((role, index) => ({ role: typeof role === 'string' ? { roleName: role, time: '' } : role, index }))
+    .filter(({ role }) => {
+      const key = canonicalAgendaRoleKey(role.roleName)
+      if (!key || seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    .sort((a, b) => agendaRoleOrder(a.role.roleName) - agendaRoleOrder(b.role.roleName) || a.index - b.index)
+    .map(({ role: templateRole }, index) => {
+    const assignedRole = roleMap.get(canonicalAgendaRoleKey(templateRole.roleName)) || roles[index] || {}
     return {
       id: assignedRole.id || `${templateRole.roleName}-${index}`,
       roleName: templateRole.roleName || assignedRole.roleName || '',
@@ -1626,6 +1640,59 @@ function agendaRowsFromTemplate(settings, roles = []) {
       personId: assignedRole.personId || '',
     }
   })
+}
+
+function canonicalAgendaRoleKey(roleName = '') {
+  const text = normalizeAgendaText(roleName)
+  if (!text) return ''
+  if (text.includes('sergeant')) return 'sergeant'
+  if (text.includes('president')) return 'president'
+  if (text.includes('toastmaster of the evening')) return 'toastmaster'
+  if (text === 'timer' || text.includes('timer')) return 'timer'
+  if (text.includes('ah counter')) return 'ah-counter'
+  if (text.includes('grammarian')) return 'grammarian'
+  if (text.includes('prepared speaker 1')) return 'prepared-1'
+  if (text.includes('prepared speaker 2')) return 'prepared-2'
+  if (text.includes('prepared speaker 3')) return 'prepared-3'
+  if (text.includes('prepared speaker 4')) return 'prepared-4'
+  if (text.includes('evaluator 1')) return 'evaluator-1'
+  if (text.includes('evaluator 2')) return 'evaluator-2'
+  if (text.includes('evaluator 3')) return 'evaluator-3'
+  if (text.includes('evaluator 4')) return 'evaluator-4'
+  if (text.includes('table topics master')) return 'topics-master'
+  if (text.includes('table topics speaker 1')) return 'topics-1'
+  if (text.includes('table topics speaker 2')) return 'topics-2'
+  if (text.includes('table topics speaker 3')) return 'topics-3'
+  if (text.includes('table topics speaker 4')) return 'topics-4'
+  if (text.includes('general evaluator')) return 'general-evaluator'
+  return text
+}
+
+function agendaRoleOrder(roleName = '') {
+  const order = [
+    'sergeant',
+    'president',
+    'toastmaster',
+    'timer',
+    'ah-counter',
+    'grammarian',
+    'prepared-1',
+    'prepared-2',
+    'prepared-3',
+    'prepared-4',
+    'topics-master',
+    'topics-1',
+    'topics-2',
+    'topics-3',
+    'topics-4',
+    'evaluator-1',
+    'evaluator-2',
+    'evaluator-3',
+    'evaluator-4',
+    'general-evaluator',
+  ]
+  const index = order.indexOf(canonicalAgendaRoleKey(roleName))
+  return index >= 0 ? index : order.length + 100
 }
 
 function minutesFromRoleTime(value = '') {
