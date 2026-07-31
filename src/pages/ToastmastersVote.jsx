@@ -1943,7 +1943,39 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
 
   function printAgenda() {
     setMeetingActionStatus(t.printAgenda)
-    requestAnimationFrame(() => window.print())
+    const agenda = document.querySelector('.tm-agenda-print')
+    if (!agenda) {
+      requestAnimationFrame(() => window.print())
+      return
+    }
+    const styleSheets = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map(node => node.outerHTML)
+      .join('\n')
+    const printWindow = window.open('', '_blank', 'width=900,height=1200')
+    if (!printWindow) {
+      requestAnimationFrame(() => window.print())
+      return
+    }
+    printWindow.document.open()
+    printWindow.document.write(`<!doctype html>
+      <html>
+        <head>
+          <title>${data.meeting.number || t.printAgenda}</title>
+          ${styleSheets}
+          <style>
+            body { margin: 0; background: white; }
+            .tm-agenda-print { display: block; border: 0; box-shadow: none; border-radius: 0; }
+            @media screen { body { padding: 18px; } .tm-agenda-print { width: 210mm; min-height: 297mm; margin: 0 auto; } }
+            @media print { body * { visibility: visible !important; } .tm-agenda-print { position: relative !important; } }
+          </style>
+        </head>
+        <body>${agenda.outerHTML}</body>
+      </html>`)
+    printWindow.document.close()
+    printWindow.focus()
+    setTimeout(() => {
+      printWindow.print()
+    }, 450)
   }
 
   function selectRecord(id) {
