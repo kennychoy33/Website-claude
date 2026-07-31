@@ -1587,17 +1587,17 @@ function candidatesFromMeetingRoles(roles, people, existingData) {
     votes: 0,
   })
   const prepared = roles
-    .filter(role => /prepared speaker/i.test(role.roleName) && toName(role))
+    .filter(role => roleCategory(role.roleName) === 'prepared' && toName(role))
     .map((role, index) => ({
       ...toCandidate(role, 'p', index),
       title: '',
       project: '',
     }))
   const impromptu = roles
-    .filter(role => /table topics speaker/i.test(role.roleName) && toName(role))
+    .filter(role => roleCategory(role.roleName) === 'impromptu' && toName(role))
     .map((role, index) => toCandidate(role, 'i', index))
   const evaluator = roles
-    .filter(role => /^evaluator\b/i.test(role.roleName) && toName(role))
+    .filter(role => roleCategory(role.roleName) === 'evaluator' && toName(role))
     .map((role, index) => toCandidate(role, 'e', index))
 
   return {
@@ -1662,9 +1662,29 @@ function findPersonInText(text, people) {
     })
 }
 
+function roleCategory(roleName = '') {
+  const normalized = normalizeAgendaText(roleName)
+  if (/prepared speaker/i.test(roleName) || normalized.includes('\u5907\u7a3f\u8bb2\u5458') || normalized.includes('\u5907\u7a3f')) return 'prepared'
+  if (/table topics speaker/i.test(roleName) || normalized.includes('\u5373\u5e2d\u8bb2\u5458')) return 'impromptu'
+  if (/^evaluator\b/i.test(roleName) || normalized.includes('\u8bc4\u8bba') || normalized.includes('\u8bc4\u4f30\u5458') || normalized.includes('\u8bb2\u8bc4')) return 'evaluator'
+  return ''
+}
+
 function roleAliases(roleName = '') {
   const lower = roleName.toLowerCase()
   const aliases = [roleName]
+  if (lower.includes('toastmaster of the evening')) aliases.push('toastmaster', 'tme', '\u4f8b\u4f1a\u4e3b\u6301\u4eba', '\u4e3b\u6301\u4eba')
+  if (lower.includes('president')) aliases.push('president', '\u4f1a\u957f', '\u4f1a\u957f\u5f00\u4f1a')
+  if (lower.includes('sergeant')) aliases.push('sergeant at arms', 'saa', '\u7eaa\u5f8b\u5b98')
+  if (lower.includes('timer')) aliases.push('timer', '\u8ba1\u65f6\u5458')
+  if (lower.includes('ah counter')) aliases.push('ah counter', '\u54fc\u54c8\u5b98', '\u5c3e\u97f3\u8ba1\u7b97\u5458', '\u5c3e\u97f3')
+  if (lower.includes('grammarian')) aliases.push('grammarian', '\u8bed\u6cd5\u5b98', '\u8bed\u8a00\u8bc4\u8bba\u5458', '\u8bed\u8a00\u8bc4\u8bba')
+  if (lower.includes('general evaluator')) aliases.push('general evaluator', '\u603b\u8bc4\u4f30', '\u603b\u8bc4\u8bba', '\u603b\u8bc4')
+  if (/^prepared speaker/i.test(roleName)) aliases.push('prepared speaker', '\u5907\u7a3f\u8bb2\u5458', '\u5907\u7a3f', '\u6f14\u8bb2')
+  if (/^evaluator/i.test(roleName)) aliases.push('evaluator', '\u8bc4\u4f30\u5458', '\u8bb2\u8bc4', '\u8bc4\u8bba')
+  if (/table topics master/i.test(roleName)) aliases.push('table topics master', '\u5373\u5e2d\u4e3b\u6301\u4eba', '\u5373\u5e2d\u4e3b\u6301')
+  if (/table topics speaker/i.test(roleName)) aliases.push('table topics speaker', '\u5373\u5e2d\u8bb2\u5458')
+  if (lower.includes('technical')) aliases.push('technical manager', '\u6280\u672f\u7ecf\u7406')
   if (lower.includes('toastmaster of the evening')) aliases.push('toastmaster', 'tme', '主持人')
   if (lower.includes('sergeant')) aliases.push('sergeant at arms', 'saa', '纪律官')
   if (lower.includes('timer')) aliases.push('timer', '计时员')
@@ -1676,6 +1696,11 @@ function roleAliases(roleName = '') {
   if (/table topics master/i.test(roleName)) aliases.push('table topics master', '即席主持')
   if (/table topics speaker/i.test(roleName)) aliases.push('table topics speaker', '即席讲员')
   return aliases.map(normalizeAgendaText).filter(Boolean)
+}
+
+function lineLooksLikeRole(line, roles) {
+  const normalized = normalizeAgendaText(line)
+  return roles.some(role => roleAliases(role.roleName).some(alias => alias && normalized.includes(alias)))
 }
 
 function importAgendaTextToRoles(text, roles, people) {
@@ -1698,8 +1723,9 @@ function importAgendaTextToRoles(text, roles, people) {
       const normalized = normalizeAgendaText(line)
       return aliases.some(alias => normalized.includes(alias)) && findPersonInText(line, people)
     })
+    const nextLine = lines[matchedLineIndex + 1] || ''
     const searchText = matchedLineIndex >= 0
-      ? [lines[matchedLineIndex], lines[matchedLineIndex + 1] || ''].join(' ')
+      ? [lines[matchedLineIndex], nextLine && !lineLooksLikeRole(nextLine, roles) ? nextLine : ''].join(' ')
       : lines.join(' ')
     const person = matchedLineIndex >= 0 ? findPersonInText(searchText, people) : null
     if (person) usedLineIndexes.add(matchedLineIndex)
