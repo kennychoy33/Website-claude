@@ -1759,6 +1759,8 @@ function formatAgendaTime(totalMinutes) {
 
 function agendaRoleSummary(role, people, data) {
   const roleName = role.roleName || ''
+  const roleKey = canonicalAgendaRoleKey(roleName)
+  const displayName = localizedRoleName(roleName, 'zh')
   const person = personLabel(people, role.personType, role.personId)
   const speaker = [...(data.prepared || []), ...(data.impromptu || []), ...(data.evaluator || [])]
     .find(item => item.name && item.name === person)
@@ -1770,16 +1772,16 @@ function agendaRoleSummary(role, people, data) {
   if (/ah counter/i.test(roleName)) return '尾音计算员说明规则'
   if (/grammarian/i.test(roleName)) return '语言评论员介绍每日一词'
   if (/table topics master/i.test(roleName)) return '即席演讲环节'
-  if (/table topics speaker/i.test(roleName)) return roleName.replace(/Table Topics Speaker/i, '即席讲员')
+  if (roleKey.startsWith('topics-') || /table topics speaker/i.test(roleName)) return displayName
   if (/general evaluator/i.test(roleName)) return '总评论'
-  if (/^evaluator/i.test(roleName)) return speaker?.title ? `评论：${speaker.title}` : roleName.replace(/Evaluator/i, '评论')
-  if (/prepared speaker/i.test(roleName)) {
+  if (roleKey.startsWith('evaluator-') || /^evaluator/i.test(roleName)) return speaker?.title ? `评论：${speaker.title}` : displayName
+  if (roleKey.startsWith('prepared-') || /prepared speaker/i.test(roleName)) {
     const title = speaker?.title ? `｜题目：${speaker.title}` : ''
     const project = speaker?.project || ''
-    return `${project || roleName}${title}`
+    return `${project || displayName}${title}`
   }
   if (normalized.includes('\u6280\u672f')) return '技术经理'
-  return roleName
+  return displayName
 }
 
 function agendaScheduleRows(rows, people, data) {
