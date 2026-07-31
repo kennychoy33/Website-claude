@@ -512,9 +512,10 @@ function CandidateNamePicker({ item, members, onSelectMember, onTypeOther, t }) 
 }
 
 function roleMatchesCandidateType(roleName, type) {
-  if (type === 'prepared') return /prepared speaker/i.test(roleName)
-  if (type === 'impromptu') return /table topics speaker/i.test(roleName)
-  if (type === 'evaluator') return /^evaluator\b/i.test(roleName)
+  const key = canonicalAgendaRoleKey(roleName)
+  if (type === 'prepared') return key.startsWith('prepared-') || /prepared speaker/i.test(roleName)
+  if (type === 'impromptu') return key.startsWith('topics-') || /table topics speaker/i.test(roleName)
+  if (type === 'evaluator') return key.startsWith('evaluator-') || /^evaluator\b/i.test(roleName)
   return false
 }
 
@@ -1592,7 +1593,7 @@ function fullToastmastersRoles(settings, lang = 'zh') {
     const templateRole = typeof role === 'string' ? { roleName: role, time: '' } : role
     return {
       id: `r${Date.now()}${index}`,
-      roleName: templateRole.roleName,
+      roleName: localizedRoleName(templateRole.roleName, lang),
       time: templateRole.time || '',
       personType: 'member',
       personId: '',
@@ -1687,6 +1688,34 @@ function canonicalAgendaRoleKey(roleName = '') {
   if (text.includes('table topics speaker 4') || text.includes('即席讲员 4') || text.includes('即席讲员4')) return 'topics-4'
   if (text.includes('general evaluator') || text.includes('总评论')) return 'general-evaluator'
   return text
+}
+
+function localizedRoleName(roleName = '', lang = 'zh') {
+  if (lang !== 'zh') return roleName
+  const key = canonicalAgendaRoleKey(roleName)
+  const zhNames = {
+    sergeant: '礼宾司',
+    president: '会长',
+    toastmaster: '例会主持人',
+    timer: '计时员',
+    'ah-counter': '尾音计算员',
+    grammarian: '语言评论员',
+    'prepared-1': '备稿讲员 1',
+    'prepared-2': '备稿讲员 2',
+    'prepared-3': '备稿讲员 3',
+    'prepared-4': '备稿讲员 4',
+    'evaluator-1': '评论员 1',
+    'evaluator-2': '评论员 2',
+    'evaluator-3': '评论员 3',
+    'evaluator-4': '评论员 4',
+    'topics-master': '即席主持人',
+    'topics-1': '即席讲员 1',
+    'topics-2': '即席讲员 2',
+    'topics-3': '即席讲员 3',
+    'topics-4': '即席讲员 4',
+    'general-evaluator': '总评论',
+  }
+  return zhNames[key] || roleName
 }
 
 function agendaRoleOrder(roleName = '') {
@@ -1949,6 +1978,7 @@ function importAgendaTextToRoles(text, roles, people) {
 }
 
 function MeetingView({ data, setData, persistState, people, meetingOps, setMeetingOps, persistMeetingOps, syncStatus, t, settings, voteLink }) {
+  const uiLang = t.langLabel === 'Language' ? 'en' : 'zh'
   const [records, setRecords] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(meetingRecordKey()) || '[]')
@@ -2038,7 +2068,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
   async function resetRolesFromTemplate() {
     if (locked) return
     setMeetingActionStatus(t.syncing)
-    const roles = fullToastmastersRoles(settings, t.langLabel === 'Language' ? 'en' : 'zh')
+    const roles = fullToastmastersRoles(settings, uiLang)
     const syncedData = candidatesFromMeetingRoles(roles, people, data)
     setMeetingOps({ ...meetingOps, roles })
     setData(syncedData)
@@ -2054,7 +2084,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
 
   async function createMeeting() {
     setSelectedRecordId('current')
-    const roles = fullToastmastersRoles(settings, t.langLabel === 'Language' ? 'en' : 'zh')
+    const roles = fullToastmastersRoles(settings, uiLang)
     const currentNumber = String(data.meeting.number || '').match(/\d+/)?.[0]
     const nextNumber = currentNumber ? `第${Number(currentNumber) + 1}次` : ''
     const next = {
@@ -2125,7 +2155,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
         : [item.time, item.summary, item.person || '', item.duration, '']),
       [],
       ['职务', '时间/分钟', '人员类型', '负责人'],
-      ...meetingOps.roles.map(item => [item.roleName, item.time || '', item.personType === 'guest' ? t.guest : t.member, personLabel(people, item.personType, item.personId)]),
+      ...meetingOps.roles.map(item => [localizedRoleName(item.roleName, uiLang), item.time || '', item.personType === 'guest' ? t.guest : t.member, personLabel(people, item.personType, item.personId)]),
       [],
       ['备稿讲员', '题目', '项目'],
       ...data.prepared.map(item => [item.name, item.title || '', item.project || '']),
@@ -2347,7 +2377,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
           </div>
           {meetingOps.roles.map(item => (
             <div className="tm-role-row" key={item.id}>
-              <input disabled={locked} value={item.roleName} onChange={event => updateRole(item.id, 'roleName', event.target.value)} />
+              <input disabled={locked} value={localizedRoleName(item.roleName, uiLang)} onChange={event => updateRole(item.id, 'roleName', event.target.value)} />
               <input disabled={locked} value={item.time || ''} onChange={event => updateRole(item.id, 'time', event.target.value)} />
               <PersonSelect
                 people={people}
