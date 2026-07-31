@@ -1541,9 +1541,9 @@ function PersonSelect({ people, personType, personId, onChange, t, disabled = fa
   )
 }
 
-function fullToastmastersRoles(settings) {
+function fullToastmastersRoles(settings, lang = 'zh') {
   const nonRolePattern = /invocation|pledge|guest introduction|word of the day|timer report|ah counter report|grammarian report|awards presentation|president closing/i
-  const fallbackRoles = [
+  const englishRoles = [
     { roleName: 'Sergeant at Arms', time: '3' },
     { roleName: 'President', time: '5' },
     { roleName: 'Toastmaster of the Evening', time: '5' },
@@ -1563,6 +1563,27 @@ function fullToastmastersRoles(settings) {
     { roleName: 'Table Topics Speaker 4', time: '2' },
     { roleName: 'General Evaluator', time: '10' },
   ]
+  const chineseRoles = [
+    { roleName: '礼宾司', time: '3' },
+    { roleName: '会长', time: '5' },
+    { roleName: '例会主持人', time: '5' },
+    { roleName: '计时员', time: '3' },
+    { roleName: '尾音计算员', time: '3' },
+    { roleName: '语言评论员', time: '5' },
+    { roleName: '备稿讲员 1', time: '7' },
+    { roleName: '备稿讲员 2', time: '7' },
+    { roleName: '备稿讲员 3', time: '7' },
+    { roleName: '评论员 1', time: '3' },
+    { roleName: '评论员 2', time: '3' },
+    { roleName: '评论员 3', time: '3' },
+    { roleName: '即席主持人', time: '20' },
+    { roleName: '即席讲员 1', time: '2' },
+    { roleName: '即席讲员 2', time: '2' },
+    { roleName: '即席讲员 3', time: '2' },
+    { roleName: '即席讲员 4', time: '2' },
+    { roleName: '总评论', time: '10' },
+  ]
+  const fallbackRoles = lang === 'zh' ? chineseRoles : englishRoles
   const templateRoles = (settings.agendaRoleTemplate || [])
     .filter(Boolean)
     .filter(role => !nonRolePattern.test(typeof role === 'string' ? role : role.roleName || ''))
@@ -1645,26 +1666,26 @@ function agendaRowsFromTemplate(settings, roles = []) {
 function canonicalAgendaRoleKey(roleName = '') {
   const text = normalizeAgendaText(roleName)
   if (!text) return ''
-  if (text.includes('sergeant')) return 'sergeant'
-  if (text.includes('president')) return 'president'
-  if (text.includes('toastmaster of the evening')) return 'toastmaster'
-  if (text === 'timer' || text.includes('timer')) return 'timer'
-  if (text.includes('ah counter')) return 'ah-counter'
-  if (text.includes('grammarian')) return 'grammarian'
-  if (text.includes('prepared speaker 1')) return 'prepared-1'
-  if (text.includes('prepared speaker 2')) return 'prepared-2'
-  if (text.includes('prepared speaker 3')) return 'prepared-3'
-  if (text.includes('prepared speaker 4')) return 'prepared-4'
-  if (text.includes('evaluator 1')) return 'evaluator-1'
-  if (text.includes('evaluator 2')) return 'evaluator-2'
-  if (text.includes('evaluator 3')) return 'evaluator-3'
-  if (text.includes('evaluator 4')) return 'evaluator-4'
-  if (text.includes('table topics master')) return 'topics-master'
-  if (text.includes('table topics speaker 1')) return 'topics-1'
-  if (text.includes('table topics speaker 2')) return 'topics-2'
-  if (text.includes('table topics speaker 3')) return 'topics-3'
-  if (text.includes('table topics speaker 4')) return 'topics-4'
-  if (text.includes('general evaluator')) return 'general-evaluator'
+  if (text.includes('sergeant') || text.includes('礼宾司')) return 'sergeant'
+  if (text.includes('president') || text.includes('会长')) return 'president'
+  if (text.includes('toastmaster of the evening') || text.includes('例会主持') || text.includes('司仪')) return 'toastmaster'
+  if (text === 'timer' || text.includes('timer') || text.includes('计时员')) return 'timer'
+  if (text.includes('ah counter') || text.includes('尾音')) return 'ah-counter'
+  if (text.includes('grammarian') || text.includes('语言评论')) return 'grammarian'
+  if (text.includes('prepared speaker 1') || text.includes('备稿讲员 1') || text.includes('备稿讲员1')) return 'prepared-1'
+  if (text.includes('prepared speaker 2') || text.includes('备稿讲员 2') || text.includes('备稿讲员2')) return 'prepared-2'
+  if (text.includes('prepared speaker 3') || text.includes('备稿讲员 3') || text.includes('备稿讲员3')) return 'prepared-3'
+  if (text.includes('prepared speaker 4') || text.includes('备稿讲员 4') || text.includes('备稿讲员4')) return 'prepared-4'
+  if (text.includes('evaluator 1') || text.includes('评论员 1') || text.includes('评论员1')) return 'evaluator-1'
+  if (text.includes('evaluator 2') || text.includes('评论员 2') || text.includes('评论员2')) return 'evaluator-2'
+  if (text.includes('evaluator 3') || text.includes('评论员 3') || text.includes('评论员3')) return 'evaluator-3'
+  if (text.includes('evaluator 4') || text.includes('评论员 4') || text.includes('评论员4')) return 'evaluator-4'
+  if (text.includes('table topics master') || text.includes('即席主持')) return 'topics-master'
+  if (text.includes('table topics speaker 1') || text.includes('即席讲员 1') || text.includes('即席讲员1')) return 'topics-1'
+  if (text.includes('table topics speaker 2') || text.includes('即席讲员 2') || text.includes('即席讲员2')) return 'topics-2'
+  if (text.includes('table topics speaker 3') || text.includes('即席讲员 3') || text.includes('即席讲员3')) return 'topics-3'
+  if (text.includes('table topics speaker 4') || text.includes('即席讲员 4') || text.includes('即席讲员4')) return 'topics-4'
+  if (text.includes('general evaluator') || text.includes('总评论')) return 'general-evaluator'
   return text
 }
 
@@ -1856,10 +1877,11 @@ function findPersonInText(text, people) {
 }
 
 function roleCategory(roleName = '') {
+  const key = canonicalAgendaRoleKey(roleName)
   const normalized = normalizeAgendaText(roleName)
-  if (/prepared speaker/i.test(roleName) || normalized.includes('\u5907\u7a3f\u8bb2\u5458') || normalized.includes('\u5907\u7a3f')) return 'prepared'
-  if (/table topics speaker/i.test(roleName) || normalized.includes('\u5373\u5e2d\u8bb2\u5458')) return 'impromptu'
-  if (/^evaluator\b/i.test(roleName) || normalized.includes('\u8bc4\u8bba') || normalized.includes('\u8bc4\u4f30\u5458') || normalized.includes('\u8bb2\u8bc4')) return 'evaluator'
+  if (key.startsWith('prepared-') || /prepared speaker/i.test(roleName) || normalized.includes('\u5907\u7a3f\u8bb2\u5458') || normalized.includes('\u5907\u7a3f')) return 'prepared'
+  if (key.startsWith('topics-') || /table topics speaker/i.test(roleName) || normalized.includes('\u5373\u5e2d\u8bb2\u5458')) return 'impromptu'
+  if (key.startsWith('evaluator-') || /^evaluator\b/i.test(roleName) || normalized.includes('\u8bc4\u8bba') || normalized.includes('\u8bc4\u4f30\u5458') || normalized.includes('\u8bb2\u8bc4')) return 'evaluator'
   return ''
 }
 
@@ -2016,7 +2038,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
   async function resetRolesFromTemplate() {
     if (locked) return
     setMeetingActionStatus(t.syncing)
-    const roles = fullToastmastersRoles(settings)
+    const roles = fullToastmastersRoles(settings, t.langLabel === 'Language' ? 'en' : 'zh')
     const syncedData = candidatesFromMeetingRoles(roles, people, data)
     setMeetingOps({ ...meetingOps, roles })
     setData(syncedData)
@@ -2032,7 +2054,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
 
   async function createMeeting() {
     setSelectedRecordId('current')
-    const roles = fullToastmastersRoles(settings)
+    const roles = fullToastmastersRoles(settings, t.langLabel === 'Language' ? 'en' : 'zh')
     const currentNumber = String(data.meeting.number || '').match(/\d+/)?.[0]
     const nextNumber = currentNumber ? `第${Number(currentNumber) + 1}次` : ''
     const next = {
@@ -2087,14 +2109,34 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
   }
 
   function exportExcel() {
+    const exportRows = standardAgendaScheduleRows(agendaRowsFromTemplate(settings, meetingOps.roles), people, data)
     const rows = [
-      ['Section', 'Role/Type', 'Name', 'Detail'],
-      ...meetingOps.roles.map(item => ['Role', item.roleName, personLabel(people, item.personType, item.personId), '']),
-      ...data.prepared.map(item => ['Prepared Speaker', item.project || '', item.name, item.title || '']),
-      ...data.evaluator.map(item => ['Evaluator', '', item.name, '']),
-      ...data.impromptu.map(item => ['Table Topics', '', item.name, '']),
+      ['分会名称', t.club],
+      ['Toastmaster ID', settings.toastmasterId || ''],
+      ['会议编号', data.meeting.number || ''],
+      ['日期', data.meeting.date || ''],
+      ['主题', data.meeting.theme || ''],
+      ['每日一词', data.meeting.word || ''],
+      ['截止时间', data.meeting.closeTime || ''],
+      [],
+      ['时间', '摘要 / 题目', '负责人', '时限', '备注'],
+      ...exportRows.map(item => item.section
+        ? ['', item.section, '', '', '']
+        : [item.time, item.summary, item.person || '', item.duration, '']),
+      [],
+      ['职务', '时间/分钟', '人员类型', '负责人'],
+      ...meetingOps.roles.map(item => [item.roleName, item.time || '', item.personType === 'guest' ? t.guest : t.member, personLabel(people, item.personType, item.personId)]),
+      [],
+      ['备稿讲员', '题目', '项目'],
+      ...data.prepared.map(item => [item.name, item.title || '', item.project || '']),
+      [],
+      ['即席讲员'],
+      ...data.impromptu.map(item => [item.name]),
+      [],
+      ['评论员'],
+      ...data.evaluator.map(item => [item.name]),
     ]
-    const csv = rows.map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n')
+    const csv = `\uFEFF${rows.map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n')}`
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
