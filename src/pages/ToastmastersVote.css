@@ -1362,6 +1362,8 @@
 }
 
 .tm-agenda-purpose {
+  display: block !important;
+  grid-template-columns: none !important;
   padding: 6px 9px;
   border-bottom: 1.5px solid #050505;
   font-size: 13.5px;
@@ -1373,11 +1375,15 @@
   font-size: 15px;
 }
 
-.tm-agenda-purpose p {
+.tm-agenda-purpose div {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  white-space: normal;
   margin: 0 0 2px;
 }
 
-.tm-agenda-purpose p:last-child {
+.tm-agenda-purpose div:last-child {
   margin-bottom: 0;
 }
 
@@ -1751,9 +1757,18 @@
   }
 
   .tm-agenda-purpose {
+    display: block !important;
+    grid-template-columns: none !important;
     padding: 1.5mm 2.2mm;
     font-size: 10.4pt;
     line-height: 1.22;
+  }
+
+  .tm-agenda-purpose div {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    white-space: normal;
   }
 
   .tm-agenda-purpose b {

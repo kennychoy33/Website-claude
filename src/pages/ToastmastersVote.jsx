@@ -2028,7 +2028,7 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
             body { margin: 0; background: white; }
             .tm-agenda-print { display: block; border: 0; box-shadow: none; border-radius: 0; }
             @media screen { body { padding: 18px; } .tm-agenda-print { width: 210mm; min-height: 297mm; margin: 0 auto; } }
-            @media print { body * { visibility: visible !important; } .tm-agenda-print { position: relative !important; } }
+            @media print { body * { visibility: visible !important; } }
           </style>
         </head>
         <body>${agenda.outerHTML}</body>
@@ -2207,8 +2207,8 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
               </div>
             </header>
             <div className="tm-agenda-purpose">
-              <p><b>宗旨：</b>1. 提供会友一个互相交流与切磋的机会。</p>
-              <p>2. 让会友在友好与和谐的气氛中逐步掌握演讲技巧，学习领导技能，从而培养自信心提升个人修养。</p>
+              <div><b>宗旨：</b>1. 提供会友一个互相交流与切磋的机会。</div>
+              <div>2. 让会友在友好与和谐的气氛中逐步掌握演讲技巧，学习领导技能，从而培养自信心提升个人修养。</div>
             </div>
             <div className="tm-agenda-title-bar">
               <strong>{data.meeting.number || t.currentMeeting}例常活动议程表</strong>
