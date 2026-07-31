@@ -1687,6 +1687,7 @@ function canonicalAgendaRoleKey(roleName = '') {
   if (text.includes('table topics speaker 3') || text.includes('即席讲员 3') || text.includes('即席讲员3')) return 'topics-3'
   if (text.includes('table topics speaker 4') || text.includes('即席讲员 4') || text.includes('即席讲员4')) return 'topics-4'
   if (text.includes('general evaluator') || text.includes('总评论')) return 'general-evaluator'
+  if (text.includes('technical') || text.includes('技术经理') || text.includes('技术')) return 'technical'
   return text
 }
 
@@ -1714,6 +1715,7 @@ function localizedRoleName(roleName = '', lang = 'zh') {
     'topics-3': '即席讲员 3',
     'topics-4': '即席讲员 4',
     'general-evaluator': '总评论',
+    technical: '技术经理',
   }
   return zhNames[key] || roleName
 }
@@ -1740,6 +1742,7 @@ function agendaRoleOrder(roleName = '') {
     'evaluator-3',
     'evaluator-4',
     'general-evaluator',
+    'technical',
   ]
   const index = order.indexOf(canonicalAgendaRoleKey(roleName))
   return index >= 0 ? index : order.length + 100
@@ -1931,6 +1934,7 @@ function roleAliases(roleName = '') {
   if (/table topics master/i.test(roleName)) aliases.push('table topics master', '\u5373\u5e2d\u4e3b\u6301\u4eba', '\u5373\u5e2d\u4e3b\u6301')
   if (/table topics speaker/i.test(roleName)) aliases.push('table topics speaker', '\u5373\u5e2d\u8bb2\u5458')
   if (lower.includes('technical')) aliases.push('technical manager', '\u6280\u672f\u7ecf\u7406')
+  if (roleName.includes('技术')) aliases.push('technical manager', '技术经理', '技术')
   if (lower.includes('toastmaster of the evening')) aliases.push('toastmaster', 'tme', '主持人')
   if (lower.includes('sergeant')) aliases.push('sergeant at arms', 'saa', '纪律官')
   if (lower.includes('timer')) aliases.push('timer', '计时员')
@@ -1949,6 +1953,116 @@ function lineLooksLikeRole(line, roles) {
   return roles.some(role => roleAliases(role.roleName).some(alias => alias && normalized.includes(alias)))
 }
 
+function cleanAgendaValue(value = '') {
+  return String(value || '')
+    .replace(/[❣️📅🕚🌍✅🆓]/g, '')
+    .replace(/^[\s:：,，]+|[\s:：,，]+$/g, '')
+    .trim()
+}
+
+function extractAgendaValue(lines, patterns) {
+  for (const line of lines) {
+    for (const pattern of patterns) {
+      const match = line.match(pattern)
+      if (match?.[1]) return cleanAgendaValue(match[1])
+    }
+  }
+  return ''
+}
+
+function formatImportedDate(value = '') {
+  const chineseDate = value.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/)
+  if (chineseDate) {
+    const [, year, month, day] = chineseDate
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  }
+  const slashDate = value.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{4})/)
+  if (slashDate) {
+    const [, day, month, year] = slashDate
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  }
+  return value
+}
+
+function parseAgendaMeetingDetails(text, currentMeeting = {}) {
+  const lines = String(text || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+  const meetingNumber = extractAgendaValue(lines, [/第\s*(\d+)\s*次\s*例会/, /第\s*(\d+)\s*次/])
+  const date = extractAgendaValue(lines, [/日期\s*[：:]\s*(.+)$/])
+  const closeTime = extractAgendaValue(lines, [/时间\s*[：:]\s*(.+)$/])
+  return {
+    ...currentMeeting,
+    number: meetingNumber ? `第${meetingNumber}次` : currentMeeting.number,
+    date: date ? formatImportedDate(date) : currentMeeting.date,
+    theme: extractAgendaValue(lines, [/例会主题\s*[：:]\s*(.+)$/]) || currentMeeting.theme,
+    word: extractAgendaValue(lines, [/每日一词\s*[：:]\s*(.+)$/]) || currentMeeting.word,
+    closeTime: closeTime || currentMeeting.closeTime,
+  }
+}
+
+function parseAgendaSpeakerDetails(text) {
+  const lines = String(text || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+  const prepared = []
+  lines.forEach((line, index) => {
+    const speakerMatch = line.match(/备稿\s*(\d+)\s*[：:]\s*(.+)$/)
+    if (!speakerMatch) return
+    const [, number, rawName] = speakerMatch
+    const nextLines = lines.slice(index + 1, index + 5)
+    const title = extractAgendaValue(nextLines, [/题目\s*[：:]\s*(.+)$/])
+    const project = extractAgendaValue(nextLines, [/等级\s*作业\s*[：:]\s*(.+)$/])
+    prepared.push({
+      index: Number(number),
+      name: cleanAgendaValue(rawName),
+      title,
+      project,
+    })
+  })
+  return prepared
+}
+
+function findExistingPersonByName(name, people) {
+  const normalized = normalizeAgendaText(name)
+  const rows = [
+    ...people.members.map(item => ({ ...item, personType: 'member' })),
+    ...people.guests.map(item => ({ ...item, personType: 'guest' })),
+  ]
+  return rows.find(item => [item.name, item.englishName].filter(Boolean).some(entry => normalizeAgendaText(entry) === normalized))
+}
+
+function ensureAgendaPeople(text, people) {
+  const lines = String(text || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+  const namePatterns = [
+    /会长致开\/休会词\s*[：:]\s*([^,，]+)/,
+    /登记\/交流\/礼宾司\s*[：:]\s*(.+)$/,
+    /司仪\s*[：:]\s*(.+)$/,
+    /备稿\s*\d+\s*[：:]\s*(.+)$/,
+    /评论\s*\d+\s*[：:]\s*(.+)$/,
+    /即席主持人\s*[：:]\s*(.+)$/,
+    /即席评论员\s*[：:]\s*(.+)$/,
+    /语言评论员\s*[：:]\s*(.+)$/,
+    /尾音计算员\s*[：:]\s*(.+)$/,
+    /计时员\s*[：:]\s*(.+)$/,
+    /技术经理\s*[：:]\s*(.+)$/,
+    /总评论\s*[：:]\s*(.+)$/,
+  ]
+  const names = lines.flatMap(line => namePatterns.map(pattern => line.match(pattern)?.[1]).filter(Boolean))
+    .map(name => cleanAgendaValue(name).replace(/[,，].*$/, '').replace(/\s*(TC|DTM|LD|L)\d*$/i, '').trim())
+    .filter(Boolean)
+  const nextGuests = [...people.guests]
+  names.forEach(name => {
+    if (findExistingPersonByName(name, { ...people, guests: nextGuests })) return
+    nextGuests.push({
+      id: `g${Date.now()}${nextGuests.length}`,
+      name,
+      email: '',
+      phone: '',
+      introducer: '',
+      visitDate: '',
+      status: 'guest',
+    })
+  })
+  return { ...people, guests: nextGuests }
+}
+
 function importAgendaTextToRoles(text, roles, people) {
   const lines = String(text || '')
     .split(/\r?\n/)
@@ -1956,8 +2070,43 @@ function importAgendaTextToRoles(text, roles, people) {
     .filter(Boolean)
   if (!lines.length) return roles
 
+  const directAssignments = [
+    { key: 'president', patterns: [/会长致开\/休会词\s*[：:]\s*([^,，]+)/] },
+    { key: 'sergeant', patterns: [/登记\/交流\/礼宾司\s*[：:]\s*(.+)$/] },
+    { key: 'toastmaster', patterns: [/司仪\s*[：:]\s*(.+)$/] },
+    { key: 'prepared-1', patterns: [/备稿\s*1\s*[：:]\s*(.+)$/] },
+    { key: 'prepared-2', patterns: [/备稿\s*2\s*[：:]\s*(.+)$/] },
+    { key: 'prepared-3', patterns: [/备稿\s*3\s*[：:]\s*(.+)$/] },
+    { key: 'evaluator-1', patterns: [/评论\s*1\s*[：:]\s*(.+)$/] },
+    { key: 'evaluator-2', patterns: [/评论\s*2\s*[：:]\s*(.+)$/] },
+    { key: 'evaluator-3', patterns: [/评论\s*3\s*[：:]\s*(.+)$/] },
+    { key: 'topics-master', patterns: [/即席主持人\s*[：:]\s*(.+)$/] },
+    { key: 'grammarian', patterns: [/语言评论员\s*[：:]\s*(.+)$/] },
+    { key: 'ah-counter', patterns: [/尾音计算员\s*[：:]\s*(.+)$/] },
+    { key: 'timer', patterns: [/计时员\s*[：:]\s*(.+)$/] },
+    { key: 'technical', patterns: [/技术经理\s*[：:]\s*(.+)$/] },
+    { key: 'general-evaluator', patterns: [/总评论\s*[：:]\s*(.+)$/] },
+  ]
+  const personForKey = new Map()
+  directAssignments.forEach(item => {
+    const value = extractAgendaValue(lines, item.patterns)
+    if (!value) return
+    const person = findPersonInText(value, people) || findExistingPersonByName(cleanAgendaValue(value), people)
+    if (person) personForKey.set(item.key, person)
+  })
+  const existingKeys = new Set(roles.map(role => canonicalAgendaRoleKey(role.roleName)))
+  let nextRoles = [...roles]
+  if (personForKey.has('technical') && !existingKeys.has('technical')) {
+    nextRoles = [
+      ...nextRoles,
+      { id: `r${Date.now()}technical`, roleName: '技术经理', time: '', personType: 'member', personId: '' },
+    ]
+  }
+
   const usedLineIndexes = new Set()
-  return roles.map(role => {
+  return nextRoles.map(role => {
+    const directPerson = personForKey.get(canonicalAgendaRoleKey(role.roleName))
+    if (directPerson) return { ...role, personType: directPerson.personType, personId: directPerson.id }
     const aliases = roleAliases(role.roleName)
     let matchedLineIndex = lines.findIndex((line, index) => {
       if (usedLineIndexes.has(index)) return false
@@ -1979,7 +2128,7 @@ function importAgendaTextToRoles(text, roles, people) {
   })
 }
 
-function MeetingView({ data, setData, persistState, people, meetingOps, setMeetingOps, persistMeetingOps, syncStatus, t, settings, voteLink }) {
+function MeetingView({ data, setData, persistState, people, setPeople, persistPeople, meetingOps, setMeetingOps, persistMeetingOps, syncStatus, t, settings, voteLink }) {
   const uiLang = t.langLabel === 'Language' ? 'en' : 'zh'
   const [records, setRecords] = useState(() => {
     try {
@@ -2123,15 +2272,29 @@ function MeetingView({ data, setData, persistState, people, meetingOps, setMeeti
 
   async function applyAgendaImport() {
     if (locked) return
-    const importedRoles = importAgendaTextToRoles(agendaImportText, meetingOps.roles, people)
-    const syncedData = candidatesFromMeetingRoles(importedRoles, people, data)
+    const importedPeople = ensureAgendaPeople(agendaImportText, people)
+    const importedMeeting = parseAgendaMeetingDetails(agendaImportText, data.meeting)
+    const preparedDetails = parseAgendaSpeakerDetails(agendaImportText)
+    const importedRoles = importAgendaTextToRoles(agendaImportText, meetingOps.roles, importedPeople)
+    const syncedData = candidatesFromMeetingRoles(importedRoles, importedPeople, { ...data, meeting: importedMeeting })
+    const detailedData = {
+      ...syncedData,
+      prepared: syncedData.prepared.map((item, index) => {
+        const details = preparedDetails.find(entry => entry.index === index + 1 || entry.name === item.name)
+        return details
+          ? { ...item, title: details.title || item.title, project: details.project || item.project }
+          : item
+      }),
+    }
+    setPeople(importedPeople)
     setMeetingOps({ ...meetingOps, roles: importedRoles })
-    setData(syncedData)
+    setData(detailedData)
     setAgendaImportOpen(false)
     setAgendaImportText('')
     setMeetingActionStatus(t.syncing)
     try {
-      const savedData = await persistState(syncedData) || syncedData
+      await persistPeople(importedPeople)
+      const savedData = await persistState(detailedData) || detailedData
       setData(savedData)
       await persistMeetingOps({ ...meetingOps, roles: importedRoles }, savedData.meeting?.id)
       setMeetingActionStatus(t.importApplied)
@@ -2875,7 +3038,7 @@ export default function ToastmastersVote() {
         {view === 'master' && superAdmin && <MasterAdminView settings={settings} t={appText} onClubsChange={setManagedClubs} />}
         {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} meetingOps={meetingOps} spaceId={workspaceId} voteLink={effectiveVoteLink} />}
         {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={appText} />}
-        {view === 'meeting' && <MeetingView data={data} setData={setData} persistState={persistState} people={people} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={appText} settings={settings} voteLink={effectiveVoteLink} />}
+        {view === 'meeting' && <MeetingView data={data} setData={setData} persistState={persistState} people={people} setPeople={setPeople} persistPeople={persistPeople} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={appText} settings={settings} voteLink={effectiveVoteLink} />}
         {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={appText} spaceId={workspaceId} />}
         {view === 'success' && <div className="tm-success-card"><h1>{appText.thankVote}</h1><p>{appText.recorded}</p></div>}
         {view === 'share' && <SharePoster data={data} t={appText} voteLink={effectiveVoteLink} />}
