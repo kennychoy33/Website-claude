@@ -1939,34 +1939,35 @@ function formatAgendaTime(totalMinutes) {
   return `${hour12}:${String(minutes).padStart(2, '0')}PM`
 }
 
-function agendaRoleSummary(role, people, data) {
+function agendaRoleSummary(role, people, data, lang = 'zh') {
   const roleName = role.roleName || ''
   const roleKey = canonicalAgendaRoleKey(roleName)
-  const displayName = localizedRoleName(roleName, 'zh')
+  const displayName = localizedRoleName(roleName, lang)
   const person = personLabel(people, role.personType, role.personId)
   const speaker = [...(data.prepared || []), ...(data.impromptu || []), ...(data.evaluator || [])]
     .find(item => item.name && item.name === person)
   const normalized = normalizeAgendaText(roleName)
-  if (/toastmaster of the evening/i.test(roleName)) return '司仪介绍节目流程'
-  if (/sergeant/i.test(roleName)) return '礼宾司致欢迎词'
-  if (/president/i.test(roleName)) return '会长致开会词'
-  if (/timer/i.test(roleName)) return '计时员说明时间规则'
-  if (/ah counter/i.test(roleName)) return '尾音计算员说明规则'
-  if (/grammarian/i.test(roleName)) return '语言评论员介绍每日一词'
-  if (/table topics master/i.test(roleName)) return '即席演讲环节'
+  const en = lang !== 'zh'
+  if (/toastmaster of the evening/i.test(roleName)) return en ? 'Introduce the meeting program' : '司仪介绍节目流程'
+  if (/sergeant/i.test(roleName)) return en ? 'Sergeant at Arms welcome' : '礼宾司致欢迎词'
+  if (/president/i.test(roleName)) return en ? 'President opening address' : '会长致开会词'
+  if (/timer/i.test(roleName)) return en ? 'Timer explains timing rules' : '计时员说明时间规则'
+  if (/ah counter/i.test(roleName)) return en ? 'Ah Counter explains rules' : '尾音计算员说明规则'
+  if (/grammarian/i.test(roleName)) return en ? 'Grammarian introduces Word of the Day' : '语言评论员介绍每日一词'
+  if (/table topics master/i.test(roleName)) return en ? 'Table Topics session' : '即席演讲环节'
   if (roleKey.startsWith('topics-') || /table topics speaker/i.test(roleName)) return displayName
-  if (/general evaluator/i.test(roleName)) return '总评论'
-  if (roleKey.startsWith('evaluator-') || /^evaluator/i.test(roleName)) return speaker?.title ? `评论：${speaker.title}` : displayName
+  if (/general evaluator/i.test(roleName)) return en ? 'General Evaluation' : '总评论'
+  if (roleKey.startsWith('evaluator-') || /^evaluator/i.test(roleName)) return speaker?.title ? `${en ? 'Evaluation' : '评论'}: ${speaker.title}` : displayName
   if (roleKey.startsWith('prepared-') || /prepared speaker/i.test(roleName)) {
-    const title = speaker?.title ? `｜题目：${speaker.title}` : ''
+    const title = speaker?.title ? `${en ? ' | Title: ' : '｜题目：'}${speaker.title}` : ''
     const project = speaker?.project || ''
     return `${project || displayName}${title}`
   }
-  if (normalized.includes('\u6280\u672f')) return '技术经理'
+  if (normalized.includes('\u6280\u672f')) return en ? 'Technical Manager' : '技术经理'
   return displayName
 }
 
-function agendaScheduleRows(rows, people, data) {
+function agendaScheduleRows(rows, people, data, lang = 'zh') {
   let current = 19 * 60 + 15
   return rows.map((role, index) => {
     const duration = minutesFromRoleTime(role.time)
@@ -1974,7 +1975,7 @@ function agendaScheduleRows(rows, people, data) {
       id: role.id || `${role.roleName}-${index}`,
       roleName: role.roleName || '',
       time: formatAgendaTime(current),
-      summary: agendaRoleSummary(role, people, data),
+      summary: agendaRoleSummary(role, people, data, lang),
       person: personLabel(people, role.personType, role.personId),
       duration: role.time || `${duration}`,
     }
@@ -1983,7 +1984,8 @@ function agendaScheduleRows(rows, people, data) {
   })
 }
 
-function standardAgendaScheduleRows(rows, people, data) {
+function standardAgendaScheduleRows(rows, people, data, lang = 'zh') {
+  const en = lang !== 'zh'
   const byKey = new Map(rows.map(role => [canonicalAgendaRoleKey(role.roleName), role]))
   const rowFor = (key, summary, duration, personKey = key, source = null) => {
     const role = source || byKey.get(personKey) || byKey.get(key) || {}
@@ -1998,45 +2000,45 @@ function standardAgendaScheduleRows(rows, people, data) {
   const preparedRows = ['prepared-1', 'prepared-2', 'prepared-3', 'prepared-4']
     .map(key => byKey.get(key))
     .filter(Boolean)
-    .map(role => rowFor(canonicalAgendaRoleKey(role.roleName), agendaRoleSummary(role, people, data), role.time || '7', canonicalAgendaRoleKey(role.roleName), role))
+    .map(role => rowFor(canonicalAgendaRoleKey(role.roleName), agendaRoleSummary(role, people, data, lang), role.time || '7', canonicalAgendaRoleKey(role.roleName), role))
   const topicRows = ['topics-1', 'topics-2', 'topics-3', 'topics-4']
     .map(key => byKey.get(key))
     .filter(Boolean)
-    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), `即席讲员 ${index + 1}`, role.time || '2', canonicalAgendaRoleKey(role.roleName), role))
+    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), `${en ? 'Table Topics Speaker' : '即席讲员'} ${index + 1}`, role.time || '2', canonicalAgendaRoleKey(role.roleName), role))
   const evaluatorRows = ['evaluator-1', 'evaluator-2', 'evaluator-3', 'evaluator-4']
     .map(key => byKey.get(key))
     .filter(Boolean)
-    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), `评论 ${index + 1}`, role.time || '3', canonicalAgendaRoleKey(role.roleName), role))
+    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), `${en ? 'Evaluator' : '评论'} ${index + 1}`, role.time || '3', canonicalAgendaRoleKey(role.roleName), role))
   const timerRole = byKey.get('timer')
   const toastmasterRole = byKey.get('toastmaster')
   const presidentRole = byKey.get('president')
 
   const flow = [
-    rowFor('sergeant', '礼宾司致欢迎词', '3'),
-    rowFor('president', '会长致开会词', '5'),
-    rowFor('toastmaster', '司仪介绍节目流程', '8-10'),
-    rowFor('timer', '计时员说明时间规则', '3'),
-    rowFor('ah-counter', '尾音计算员说明规则', '3'),
-    rowFor('grammarian', '语言评论员介绍每日一词', '5'),
-    { section: '演说环节' },
+    rowFor('sergeant', en ? 'Sergeant at Arms welcome' : '礼宾司致欢迎词', '3'),
+    rowFor('president', en ? 'President opening address' : '会长致开会词', '5'),
+    rowFor('toastmaster', en ? 'Introduce the meeting program' : '司仪介绍节目流程', '8-10'),
+    rowFor('timer', en ? 'Timer explains timing rules' : '计时员说明时间规则', '3'),
+    rowFor('ah-counter', en ? 'Ah Counter explains rules' : '尾音计算员说明规则', '3'),
+    rowFor('grammarian', en ? 'Grammarian introduces Word of the Day' : '语言评论员介绍每日一词', '5'),
+    { section: en ? 'Prepared Speeches' : '演说环节' },
     ...preparedRows,
-    rowFor('timer-report-1', '计时报告', '1', 'timer', timerRole),
-    rowFor('topics-master', '即席演讲环节【每位讲员1至2分钟】', byKey.get('topics-master')?.time || '10', 'topics-master'),
+    rowFor('timer-report-1', en ? 'Timer Report' : '计时报告', '1', 'timer', timerRole),
+    rowFor('topics-master', en ? 'Table Topics Session [1 to 2 minutes each]' : '即席演讲环节【每位讲员1至2分钟】', byKey.get('topics-master')?.time || '10', 'topics-master'),
     ...topicRows,
-    rowFor('timer-report-2', '计时报告', '1', 'timer', timerRole),
-    rowFor('photo', '大合照', '1', 'president', presidentRole),
-    rowFor('break', '交流时间', '6', 'toastmaster', toastmasterRole),
-    { section: '评论（由总评论承接）' },
+    rowFor('timer-report-2', en ? 'Timer Report' : '计时报告', '1', 'timer', timerRole),
+    rowFor('photo', en ? 'Group Photo' : '大合照', '1', 'president', presidentRole),
+    rowFor('break', en ? 'Networking Break' : '交流时间', '6', 'toastmaster', toastmasterRole),
+    { section: en ? 'Evaluation Session' : '评论（由总评论承接）' },
     ...evaluatorRows,
-    rowFor('topics-evaluation', '即席评论', '3-5', 'general-evaluator'),
-    rowFor('timer-report-3', '计时报告', '1', 'timer', timerRole),
-    rowFor('vote', '投票环节', '1', 'toastmaster', toastmasterRole),
-    rowFor('grammarian-report', '语言评论', '3-5', 'grammarian'),
-    rowFor('ah-counter-report', '尾音计算报告', '2-3', 'ah-counter'),
-    rowFor('general-evaluator', '总评论', byKey.get('general-evaluator')?.time || '8-10', 'general-evaluator'),
-    rowFor('awards', '表扬最佳表现', '5', 'toastmaster', toastmasterRole),
-    rowFor('exco-report', '执委及事项报告', '3', 'toastmaster', toastmasterRole),
-    rowFor('president-closing', '会长致休会词', '3-5', 'president', presidentRole),
+    rowFor('topics-evaluation', en ? 'Table Topics Evaluation' : '即席评论', '3-5', 'general-evaluator'),
+    rowFor('timer-report-3', en ? 'Timer Report' : '计时报告', '1', 'timer', timerRole),
+    rowFor('vote', en ? 'Voting Session' : '投票环节', '1', 'toastmaster', toastmasterRole),
+    rowFor('grammarian-report', en ? 'Grammarian Report' : '语言评论', '3-5', 'grammarian'),
+    rowFor('ah-counter-report', en ? 'Ah Counter Report' : '尾音计算报告', '2-3', 'ah-counter'),
+    rowFor('general-evaluator', en ? 'General Evaluation' : '总评论', byKey.get('general-evaluator')?.time || '8-10', 'general-evaluator'),
+    rowFor('awards', en ? 'Awards Presentation' : '表扬最佳表现', '5', 'toastmaster', toastmasterRole),
+    rowFor('exco-report', en ? 'EXCO / Announcements' : '执委及事项报告', '3', 'toastmaster', toastmasterRole),
+    rowFor('president-closing', en ? 'President closing address' : '会长致休会词', '3-5', 'president', presidentRole),
   ]
   let current = 19 * 60 + 15
   return flow.map((item, index) => {
@@ -2483,31 +2485,32 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
   }
 
   function exportExcel() {
-    const exportRows = standardAgendaScheduleRows(agendaRowsFromTemplate(settings, meetingOps.roles), people, data)
+    const en = uiLang === 'en'
+    const exportRows = standardAgendaScheduleRows(agendaRowsFromTemplate(settings, meetingOps.roles), people, data, uiLang)
     const rows = [
-      ['分会名称', t.club],
+      [en ? 'Club Name' : '分会名称', t.club],
       ['Toastmaster ID', settings.toastmasterId || ''],
-      ['会议编号', data.meeting.number || ''],
-      ['日期', data.meeting.date || ''],
-      ['主题', data.meeting.theme || ''],
-      ['每日一词', data.meeting.word || ''],
-      ['截止时间', data.meeting.closeTime || ''],
+      [en ? 'Meeting No.' : '会议编号', data.meeting.number || ''],
+      [en ? 'Date' : '日期', data.meeting.date || ''],
+      [en ? 'Theme' : '主题', data.meeting.theme || ''],
+      [en ? 'Word of the Day' : '每日一词', data.meeting.word || ''],
+      [en ? 'Close Time' : '截止时间', data.meeting.closeTime || ''],
       [],
-      ['时间', '摘要 / 题目', '负责人', '时限', '备注'],
+      [en ? 'Time' : '时间', en ? 'Agenda / Topic' : '摘要 / 题目', en ? 'Person In Charge' : '负责人', en ? 'Time Limit' : '时限', en ? 'Remark' : '备注'],
       ...exportRows.map(item => item.section
         ? ['', item.section, '', '', '']
         : [item.time, item.summary, item.person || '', item.duration, '']),
       [],
-      ['职务', '时间/分钟', '人员类型', '负责人'],
+      [en ? 'Role' : '职务', en ? 'Time / Minutes' : '时间/分钟', en ? 'Person Type' : '人员类型', en ? 'Person In Charge' : '负责人'],
       ...meetingOps.roles.map(item => [localizedRoleName(item.roleName, uiLang), item.time || '', item.personType === 'guest' ? t.guest : t.member, personLabel(people, item.personType, item.personId)]),
       [],
-      ['备稿讲员', '题目', '项目'],
+      [en ? 'Prepared Speakers' : '备稿讲员', en ? 'Title' : '题目', en ? 'Project' : '项目'],
       ...data.prepared.map(item => [item.name, item.title || '', item.project || '']),
       [],
-      ['即席讲员'],
+      [en ? 'Table Topics Speakers' : '即席讲员'],
       ...data.impromptu.map(item => [item.name]),
       [],
-      ['评论员'],
+      [en ? 'Evaluators' : '评论员'],
       ...data.evaluator.map(item => [item.name]),
     ]
     const csv = `\uFEFF${rows.map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n')}`
@@ -2549,7 +2552,48 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
   }
 
   const agendaPrintRows = agendaRowsFromTemplate(settings, meetingOps.roles)
-  const agendaSchedule = standardAgendaScheduleRows(agendaPrintRows, people, data)
+  const agendaSchedule = standardAgendaScheduleRows(agendaPrintRows, people, data, uiLang)
+  const agendaText = uiLang === 'en'
+    ? {
+        motto: 'Where Leaders Are Made',
+        registration: 'Toastmasters International Registration No.',
+        area: '(District 102, Division M3)',
+        rightMark: 'Toastmasters Club',
+        purposeTitle: 'Purpose:',
+        purpose1: '1. Provide members a supportive environment to communicate, learn, and grow together.',
+        purpose2: '2. Help members improve public speaking and leadership skills with confidence and mutual respect.',
+        agendaTitle: `${data.meeting.number || t.currentMeeting} Regular Meeting Agenda`,
+        topic: 'Theme',
+        word: 'Word of the Day',
+        qrNote: <>Scan here to check in<br />and vote for best speakers</>,
+        time: 'Time',
+        summary: 'Agenda / Topic',
+        person: 'Person In Charge',
+        duration: 'Time Limit',
+        remark: 'Remark',
+        goodNight: 'Good night!',
+        footerTitle: 'Regular Meeting Agenda',
+      }
+    : {
+        motto: '中爱吾会， 化雨春风， 齐展翅',
+        registration: '国际讲演会注册编号',
+        area: '（102区域 M3分区）',
+        rightMark: '中华校友会',
+        purposeTitle: '宗旨：',
+        purpose1: '1. 提供会友一个互相交流与切磋的机会。',
+        purpose2: '2. 让会友在友好与和谐的气氛中逐步掌握演讲技巧，学习领导技能，从而培养自信心提升个人修养。',
+        agendaTitle: `${data.meeting.number || t.currentMeeting}例常活动议程表`,
+        topic: '主题',
+        word: '每日一词',
+        qrNote: <>请扫这里签到和<br />投选最佳讲员</>,
+        time: '时间',
+        summary: '摘要',
+        person: '负责人',
+        duration: '时限',
+        remark: '备注',
+        goodNight: '晚安！',
+        footerTitle: '例常活动议程表',
+      }
 
   function printAgenda() {
     setMeetingActionStatus(t.printAgenda)
@@ -2739,7 +2783,7 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
 
       <section className="tm-agenda-print">
         <div className="tm-agenda-content">
-          <div className="tm-agenda-motto">中爱吾会， 化雨春风， 齐展翅</div>
+          <div className="tm-agenda-motto">{agendaText.motto}</div>
           <div className="tm-agenda-frame">
             <header className="tm-agenda-template-head">
               <div className="tm-agenda-logo-box">
@@ -2748,26 +2792,26 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
               <div>
                 <h1>{t.club}</h1>
                 <h3>CHUNG HWA ALUMNI ASSOCIATION MANDARIN TOASTMASTERS CLUB</h3>
-                <p>国际讲演会注册编号：{settings.toastmasterId || 'CB-00003015'}　（102区域 M3分区）</p>
+                <p>{agendaText.registration}: {settings.toastmasterId || 'CB-00003015'} {agendaText.area}</p>
               </div>
               <div className="tm-agenda-logo-box right-mark">
-                <span>中华校友会</span>
+                <span>{agendaText.rightMark}</span>
               </div>
             </header>
             <div className="tm-agenda-purpose">
-              <div><b>宗旨：</b>1. 提供会友一个互相交流与切磋的机会。</div>
-              <div>2. 让会友在友好与和谐的气氛中逐步掌握演讲技巧，学习领导技能，从而培养自信心提升个人修养。</div>
+              <div><b>{agendaText.purposeTitle}</b>{agendaText.purpose1}</div>
+              <div>{agendaText.purpose2}</div>
             </div>
             <div className="tm-agenda-title-bar">
-              <strong>{data.meeting.number || t.currentMeeting}例常活动议程表</strong>
+              <strong>{agendaText.agendaTitle}</strong>
               <span>{data.meeting.date || t.pending}</span>
             </div>
             <div className="tm-agenda-topic-row">
               <div>
-                <p>主题：{data.meeting.theme || t.pending}</p>
-                <p>每日一词：{data.meeting.word || t.pending}</p>
+                <p>{agendaText.topic}: {data.meeting.theme || t.pending}</p>
+                <p>{agendaText.word}: {data.meeting.word || t.pending}</p>
               </div>
-              <div className="tm-agenda-qr-note">请扫这里签到和<br />投选最佳讲员</div>
+              <div className="tm-agenda-qr-note">{agendaText.qrNote}</div>
               <div className="tm-agenda-qr">
                 <QrBlock value={voteLink} compact />
               </div>
@@ -2782,11 +2826,11 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
               </colgroup>
               <thead>
                 <tr>
-                  <th>时间</th>
-                  <th>摘要</th>
-                  <th>负责人</th>
-                  <th>时限</th>
-                  <th>备注</th>
+                  <th>{agendaText.time}</th>
+                  <th>{agendaText.summary}</th>
+                  <th>{agendaText.person}</th>
+                  <th>{agendaText.duration}</th>
+                  <th>{agendaText.remark}</th>
                 </tr>
               </thead>
               <tbody>
@@ -2805,11 +2849,11 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
                     )}
                   </Fragment>
                 ))}
-                <tr className="night"><td>{data.meeting.closeTime || '10:00PM'}</td><td colSpan="4">晚安！</td></tr>
+                <tr className="night"><td>{data.meeting.closeTime || '10:00PM'}</td><td colSpan="4">{agendaText.goodNight}</td></tr>
               </tbody>
             </table>
           </div>
-          <div className="tm-agenda-footer">{t.club} · {data.meeting.number || t.currentMeeting}例常活动议程表</div>
+          <div className="tm-agenda-footer">{t.club} - {data.meeting.number || t.currentMeeting} {agendaText.footerTitle}</div>
           <div className="tm-agenda-mini-summary">
             <div><b>{t.preparedSpeakers}</b>{data.prepared.map(item => <span key={item.id}>{item.name || t.pending}{item.title ? `｜${item.title}` : ''}</span>)}</div>
             <div><b>{t.tableTopics}</b>{data.impromptu.map(item => <span key={item.id}>{item.name || t.pending}</span>)}</div>
