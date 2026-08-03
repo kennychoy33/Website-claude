@@ -944,6 +944,15 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
             <span>{t.adminName}</span>
             <input disabled={locked} value={settings.adminName} onChange={event => update('adminName', event.target.value)} />
           </label>
+          <label>
+            <span>例会表语言 / Agenda Language</span>
+            <select disabled={locked} value={settings.agendaLanguage || 'auto'} onChange={event => update('agendaLanguage', event.target.value)}>
+              <option value="auto">跟随界面 / Follow UI</option>
+              <option value="zh">中文</option>
+              <option value="en">English</option>
+              <option value="bi">双语 / Bilingual</option>
+            </select>
+          </label>
         </div>
       </section>
 
@@ -1871,7 +1880,6 @@ function canonicalAgendaRoleKey(roleName = '') {
 }
 
 function localizedRoleName(roleName = '', lang = 'zh') {
-  if (lang !== 'zh') return roleName
   const key = canonicalAgendaRoleKey(roleName)
   const zhNames = {
     sergeant: '礼宾司',
@@ -1896,6 +1904,31 @@ function localizedRoleName(roleName = '', lang = 'zh') {
     'general-evaluator': '总评论',
     technical: '技术经理',
   }
+  const enNames = {
+    sergeant: 'Sergeant at Arms',
+    president: 'President',
+    toastmaster: 'Toastmaster of the Evening',
+    timer: 'Timer',
+    'ah-counter': 'Ah Counter',
+    grammarian: 'Grammarian',
+    'prepared-1': 'Prepared Speaker 1',
+    'prepared-2': 'Prepared Speaker 2',
+    'prepared-3': 'Prepared Speaker 3',
+    'prepared-4': 'Prepared Speaker 4',
+    'evaluator-1': 'Evaluator 1',
+    'evaluator-2': 'Evaluator 2',
+    'evaluator-3': 'Evaluator 3',
+    'evaluator-4': 'Evaluator 4',
+    'topics-master': 'Table Topics Master',
+    'topics-1': 'Table Topics Speaker 1',
+    'topics-2': 'Table Topics Speaker 2',
+    'topics-3': 'Table Topics Speaker 3',
+    'topics-4': 'Table Topics Speaker 4',
+    'general-evaluator': 'General Evaluator',
+    technical: 'Technical Manager',
+  }
+  if (lang === 'bi') return `${zhNames[key] || roleName} / ${enNames[key] || roleName}`
+  if (lang !== 'zh') return enNames[key] || roleName
   return zhNames[key] || roleName
 }
 
@@ -1940,6 +1973,7 @@ function formatAgendaTime(totalMinutes) {
 }
 
 function agendaRoleSummary(role, people, data, lang = 'zh') {
+  if (lang === 'bi') return `${agendaRoleSummary(role, people, data, 'zh')} / ${agendaRoleSummary(role, people, data, 'en')}`
   const roleName = role.roleName || ''
   const roleKey = canonicalAgendaRoleKey(roleName)
   const displayName = localizedRoleName(roleName, lang)
@@ -1986,6 +2020,7 @@ function agendaScheduleRows(rows, people, data, lang = 'zh') {
 
 function standardAgendaScheduleRows(rows, people, data, lang = 'zh') {
   const en = lang !== 'zh'
+  const text = (zh, english) => lang === 'bi' ? `${zh} / ${english}` : (en ? english : zh)
   const byKey = new Map(rows.map(role => [canonicalAgendaRoleKey(role.roleName), role]))
   const rowFor = (key, summary, duration, personKey = key, source = null) => {
     const role = source || byKey.get(personKey) || byKey.get(key) || {}
@@ -2004,41 +2039,41 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh') {
   const topicRows = ['topics-1', 'topics-2', 'topics-3', 'topics-4']
     .map(key => byKey.get(key))
     .filter(Boolean)
-    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), `${en ? 'Table Topics Speaker' : '即席讲员'} ${index + 1}`, role.time || '2', canonicalAgendaRoleKey(role.roleName), role))
+    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), `${text('即席讲员', 'Table Topics Speaker')} ${index + 1}`, role.time || '2', canonicalAgendaRoleKey(role.roleName), role))
   const evaluatorRows = ['evaluator-1', 'evaluator-2', 'evaluator-3', 'evaluator-4']
     .map(key => byKey.get(key))
     .filter(Boolean)
-    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), `${en ? 'Evaluator' : '评论'} ${index + 1}`, role.time || '3', canonicalAgendaRoleKey(role.roleName), role))
+    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), `${text('评论', 'Evaluator')} ${index + 1}`, role.time || '3', canonicalAgendaRoleKey(role.roleName), role))
   const timerRole = byKey.get('timer')
   const toastmasterRole = byKey.get('toastmaster')
   const presidentRole = byKey.get('president')
 
   const flow = [
-    rowFor('sergeant', en ? 'Sergeant at Arms welcome' : '礼宾司致欢迎词', '3'),
-    rowFor('president', en ? 'President opening address' : '会长致开会词', '5'),
-    rowFor('toastmaster', en ? 'Introduce the meeting program' : '司仪介绍节目流程', '8-10'),
-    rowFor('timer', en ? 'Timer explains timing rules' : '计时员说明时间规则', '3'),
-    rowFor('ah-counter', en ? 'Ah Counter explains rules' : '尾音计算员说明规则', '3'),
-    rowFor('grammarian', en ? 'Grammarian introduces Word of the Day' : '语言评论员介绍每日一词', '5'),
-    { section: en ? 'Prepared Speeches' : '演说环节' },
+    rowFor('sergeant', text('礼宾司致欢迎词', 'Sergeant at Arms welcome'), '3'),
+    rowFor('president', text('会长致开会词', 'President opening address'), '5'),
+    rowFor('toastmaster', text('司仪介绍节目流程', 'Introduce the meeting program'), '8-10'),
+    rowFor('timer', text('计时员说明时间规则', 'Timer explains timing rules'), '3'),
+    rowFor('ah-counter', text('尾音计算员说明规则', 'Ah Counter explains rules'), '3'),
+    rowFor('grammarian', text('语言评论员介绍每日一词', 'Grammarian introduces Word of the Day'), '5'),
+    { section: text('演说环节', 'Prepared Speeches') },
     ...preparedRows,
-    rowFor('timer-report-1', en ? 'Timer Report' : '计时报告', '1', 'timer', timerRole),
-    rowFor('topics-master', en ? 'Table Topics Session [1 to 2 minutes each]' : '即席演讲环节【每位讲员1至2分钟】', byKey.get('topics-master')?.time || '10', 'topics-master'),
+    rowFor('timer-report-1', text('计时报告', 'Timer Report'), '1', 'timer', timerRole),
+    rowFor('topics-master', text('即席演讲环节【每位讲员1至2分钟】', 'Table Topics Session [1 to 2 minutes each]'), byKey.get('topics-master')?.time || '10', 'topics-master'),
     ...topicRows,
-    rowFor('timer-report-2', en ? 'Timer Report' : '计时报告', '1', 'timer', timerRole),
-    rowFor('photo', en ? 'Group Photo' : '大合照', '1', 'president', presidentRole),
-    rowFor('break', en ? 'Networking Break' : '交流时间', '6', 'toastmaster', toastmasterRole),
-    { section: en ? 'Evaluation Session' : '评论（由总评论承接）' },
+    rowFor('timer-report-2', text('计时报告', 'Timer Report'), '1', 'timer', timerRole),
+    rowFor('photo', text('大合照', 'Group Photo'), '1', 'president', presidentRole),
+    rowFor('break', text('交流时间', 'Networking Break'), '6', 'toastmaster', toastmasterRole),
+    { section: text('评论（由总评论承接）', 'Evaluation Session') },
     ...evaluatorRows,
-    rowFor('topics-evaluation', en ? 'Table Topics Evaluation' : '即席评论', '3-5', 'general-evaluator'),
-    rowFor('timer-report-3', en ? 'Timer Report' : '计时报告', '1', 'timer', timerRole),
-    rowFor('vote', en ? 'Voting Session' : '投票环节', '1', 'toastmaster', toastmasterRole),
-    rowFor('grammarian-report', en ? 'Grammarian Report' : '语言评论', '3-5', 'grammarian'),
-    rowFor('ah-counter-report', en ? 'Ah Counter Report' : '尾音计算报告', '2-3', 'ah-counter'),
-    rowFor('general-evaluator', en ? 'General Evaluation' : '总评论', byKey.get('general-evaluator')?.time || '8-10', 'general-evaluator'),
-    rowFor('awards', en ? 'Awards Presentation' : '表扬最佳表现', '5', 'toastmaster', toastmasterRole),
-    rowFor('exco-report', en ? 'EXCO / Announcements' : '执委及事项报告', '3', 'toastmaster', toastmasterRole),
-    rowFor('president-closing', en ? 'President closing address' : '会长致休会词', '3-5', 'president', presidentRole),
+    rowFor('topics-evaluation', text('即席评论', 'Table Topics Evaluation'), '3-5', 'general-evaluator'),
+    rowFor('timer-report-3', text('计时报告', 'Timer Report'), '1', 'timer', timerRole),
+    rowFor('vote', text('投票环节', 'Voting Session'), '1', 'toastmaster', toastmasterRole),
+    rowFor('grammarian-report', text('语言评论', 'Grammarian Report'), '3-5', 'grammarian'),
+    rowFor('ah-counter-report', text('尾音计算报告', 'Ah Counter Report'), '2-3', 'ah-counter'),
+    rowFor('general-evaluator', text('总评论', 'General Evaluation'), byKey.get('general-evaluator')?.time || '8-10', 'general-evaluator'),
+    rowFor('awards', text('表扬最佳表现', 'Awards Presentation'), '5', 'toastmaster', toastmasterRole),
+    rowFor('exco-report', text('执委及事项报告', 'EXCO / Announcements'), '3', 'toastmaster', toastmasterRole),
+    rowFor('president-closing', text('会长致休会词', 'President closing address'), '3-5', 'president', presidentRole),
   ]
   let current = 19 * 60 + 15
   return flow.map((item, index) => {
@@ -2485,32 +2520,35 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
   }
 
   function exportExcel() {
-    const en = uiLang === 'en'
-    const exportRows = standardAgendaScheduleRows(agendaRowsFromTemplate(settings, meetingOps.roles), people, data, uiLang)
+    const exportLang = settings.agendaLanguage === 'auto' || !settings.agendaLanguage ? uiLang : settings.agendaLanguage
+    const en = exportLang === 'en'
+    const bi = exportLang === 'bi'
+    const label = (zh, english) => bi ? `${zh} / ${english}` : (en ? english : zh)
+    const exportRows = standardAgendaScheduleRows(agendaRowsFromTemplate(settings, meetingOps.roles), people, data, exportLang)
     const rows = [
-      [en ? 'Club Name' : '分会名称', t.club],
+      [label('分会名称', 'Club Name'), t.club],
       ['Toastmaster ID', settings.toastmasterId || ''],
-      [en ? 'Meeting No.' : '会议编号', data.meeting.number || ''],
-      [en ? 'Date' : '日期', data.meeting.date || ''],
-      [en ? 'Theme' : '主题', data.meeting.theme || ''],
-      [en ? 'Word of the Day' : '每日一词', data.meeting.word || ''],
-      [en ? 'Close Time' : '截止时间', data.meeting.closeTime || ''],
+      [label('会议编号', 'Meeting No.'), data.meeting.number || ''],
+      [label('日期', 'Date'), data.meeting.date || ''],
+      [label('主题', 'Theme'), data.meeting.theme || ''],
+      [label('每日一词', 'Word of the Day'), data.meeting.word || ''],
+      [label('截止时间', 'Close Time'), data.meeting.closeTime || ''],
       [],
-      [en ? 'Time' : '时间', en ? 'Agenda / Topic' : '摘要 / 题目', en ? 'Person In Charge' : '负责人', en ? 'Time Limit' : '时限', en ? 'Remark' : '备注'],
+      [label('时间', 'Time'), label('摘要 / 题目', 'Agenda / Topic'), label('负责人', 'Person In Charge'), label('时限', 'Time Limit'), label('备注', 'Remark')],
       ...exportRows.map(item => item.section
         ? ['', item.section, '', '', '']
         : [item.time, item.summary, item.person || '', item.duration, '']),
       [],
-      [en ? 'Role' : '职务', en ? 'Time / Minutes' : '时间/分钟', en ? 'Person Type' : '人员类型', en ? 'Person In Charge' : '负责人'],
-      ...meetingOps.roles.map(item => [localizedRoleName(item.roleName, uiLang), item.time || '', item.personType === 'guest' ? t.guest : t.member, personLabel(people, item.personType, item.personId)]),
+      [label('职务', 'Role'), label('时间/分钟', 'Time / Minutes'), label('人员类型', 'Person Type'), label('负责人', 'Person In Charge')],
+      ...meetingOps.roles.map(item => [localizedRoleName(item.roleName, exportLang), item.time || '', item.personType === 'guest' ? t.guest : t.member, personLabel(people, item.personType, item.personId)]),
       [],
-      [en ? 'Prepared Speakers' : '备稿讲员', en ? 'Title' : '题目', en ? 'Project' : '项目'],
+      [label('备稿讲员', 'Prepared Speakers'), label('题目', 'Title'), label('项目', 'Project')],
       ...data.prepared.map(item => [item.name, item.title || '', item.project || '']),
       [],
-      [en ? 'Table Topics Speakers' : '即席讲员'],
+      [label('即席讲员', 'Table Topics Speakers')],
       ...data.impromptu.map(item => [item.name]),
       [],
-      [en ? 'Evaluators' : '评论员'],
+      [label('评论员', 'Evaluators')],
       ...data.evaluator.map(item => [item.name]),
     ]
     const csv = `\uFEFF${rows.map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n')}`
@@ -2552,8 +2590,30 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
   }
 
   const agendaPrintRows = agendaRowsFromTemplate(settings, meetingOps.roles)
-  const agendaSchedule = standardAgendaScheduleRows(agendaPrintRows, people, data, uiLang)
-  const agendaText = uiLang === 'en'
+  const agendaLang = settings.agendaLanguage === 'auto' || !settings.agendaLanguage ? uiLang : settings.agendaLanguage
+  const agendaSchedule = standardAgendaScheduleRows(agendaPrintRows, people, data, agendaLang)
+  const agendaText = agendaLang === 'bi'
+    ? {
+        motto: '中爱吾会， 化雨春风， 齐展翅 / Where Leaders Are Made',
+        registration: '国际讲演会注册编号 / Toastmasters International Registration No.',
+        area: '（102区域 M3分区 / District 102, Division M3）',
+        rightMark: '中华校友会 / Toastmasters Club',
+        purposeTitle: '宗旨 / Purpose: ',
+        purpose1: '1. 提供会友一个互相交流与切磋的机会。 / Provide members a supportive environment to communicate, learn, and grow together.',
+        purpose2: '2. 让会友逐步掌握演讲技巧，学习领导技能，提升自信与修养。 / Help members improve public speaking and leadership skills with confidence and mutual respect.',
+        agendaTitle: `${data.meeting.number || t.currentMeeting}例常活动议程表 / ${data.meeting.number || t.currentMeeting} Regular Meeting Agenda`,
+        topic: '主题 / Theme',
+        word: '每日一词 / Word of the Day',
+        qrNote: <>请扫这里签到和投选最佳讲员<br />Scan here to check in and vote</>,
+        time: '时间 / Time',
+        summary: '摘要 / Agenda',
+        person: '负责人 / Person',
+        duration: '时限 / Time Limit',
+        remark: '备注 / Remark',
+        goodNight: '晚安！ / Good night!',
+        footerTitle: '例常活动议程表 / Regular Meeting Agenda',
+      }
+    : agendaLang === 'en'
     ? {
         motto: 'Where Leaders Are Made',
         registration: 'Toastmasters International Registration No.',
@@ -3005,6 +3065,7 @@ export default function ToastmastersVote() {
     logoDataUrl: '',
     agendaTemplateName: '',
     agendaTemplateDataUrl: '',
+    agendaLanguage: 'auto',
     clubAdmins: [],
   })
   const publicView = new URLSearchParams(window.location.search).get('view') === 'vote'
@@ -3111,6 +3172,7 @@ export default function ToastmastersVote() {
           setSettings({
             ...result.data,
             toastmasterId: fallbackToastmasterId,
+            agendaLanguage: result.data.agendaLanguage || 'auto',
             clubAdmins: (result.data.clubAdmins || []).map(admin => ({
               ...admin,
               toastmasterId: admin.toastmasterId || fallbackToastmasterId,
@@ -3118,7 +3180,7 @@ export default function ToastmastersVote() {
           })
         }
       } catch {
-        if (!ignore) setSettings({ clubName: t.club, clubShort: t.clubShort, toastmasterId: '', adminName: '', username: '', logoDataUrl: '', agendaTemplateName: '', agendaTemplateDataUrl: '', clubAdmins: [] })
+        if (!ignore) setSettings({ clubName: t.club, clubShort: t.clubShort, toastmasterId: '', adminName: '', username: '', logoDataUrl: '', agendaTemplateName: '', agendaTemplateDataUrl: '', agendaLanguage: 'auto', clubAdmins: [] })
       }
     }
     hydrateSettings()
@@ -3166,7 +3228,7 @@ export default function ToastmastersVote() {
     setData(null)
     setPeople({ members: [], guests: [] })
     setMeetingOps({ attendance: [], roles: [] })
-    setSettings({ clubName: '', clubShort: '', toastmasterId: '', adminName: '', username: '', logoDataUrl: '', agendaTemplateName: '', agendaTemplateDataUrl: '', clubAdmins: [] })
+    setSettings({ clubName: '', clubShort: '', toastmasterId: '', adminName: '', username: '', logoDataUrl: '', agendaTemplateName: '', agendaTemplateDataUrl: '', agendaLanguage: 'auto', clubAdmins: [] })
     setView('system')
   }
 
