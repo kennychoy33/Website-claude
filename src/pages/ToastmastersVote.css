@@ -115,6 +115,41 @@
   font-weight: 900;
 }
 
+.tm-locked-club {
+  display: block;
+  width: 100%;
+  border-radius: 7px;
+  padding: 9px 10px;
+  color: var(--tm-navy);
+  background: rgba(255,255,255,.9);
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.tm-current-user {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  margin: 0 0 12px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 8px;
+  background: rgba(255,255,255,.07);
+}
+
+.tm-current-user span,
+.tm-current-user small {
+  color: rgba(255,255,255,.72);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tm-current-user b {
+  color: white;
+  font-size: 13px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
 .tm-sidebar-bottom {
   margin-top: auto;
   padding-top: 18px;

@@ -132,6 +132,10 @@ const LANG = {
     saveCloudConfig: '保存云端设定并刷新',
     cloudConfigHint: '如果 GitHub secrets 还没设，可以先在这里填 Supabase URL 和 anon key。QR 会自动带上公开 anon 配置，让投票者连接同一个云端资料库。',
     currentClub: '当前分会',
+    currentUser: '目前使用者',
+    roleSuperAdmin: '最高管理员',
+    roleClubAdmin: '分会管理员',
+    roleUser: '普通使用者',
     defaultClub: '默认分会',
     switchClubHint: '切换分会后，会员、例会、投票、QR 和例会表会使用该分会自己的资料。',
     unnamed: '未命名',
@@ -320,6 +324,10 @@ const LANG = {
     saveCloudConfig: 'Save Cloud Settings and Reload',
     cloudConfigHint: 'If GitHub secrets are not set yet, enter the Supabase URL and anon key here. The QR will carry this public anon config so voters connect to the same cloud database.',
     currentClub: 'Current Club',
+    currentUser: 'Current User',
+    roleSuperAdmin: 'Super Admin',
+    roleClubAdmin: 'Club Admin',
+    roleUser: 'User',
     defaultClub: 'Default Club',
     switchClubHint: 'After switching clubs, members, meetings, votes, QR links, and agendas use that club’s own data.',
     unnamed: 'Unnamed',
@@ -2886,16 +2894,36 @@ function LoginView({ lang, setLang, t, onLogin }) {
 }
 
 function ClubSwitcher({ clubs, selectedClubId, onChange, t, disabled = false }) {
+  const selectedClub = selectedClubId === 'default'
+    ? { clubName: t.defaultClub }
+    : clubs.find(club => club.id === selectedClubId)
+  const label = selectedClub?.clubName || selectedClub?.toastmasterId || selectedClubId || t.defaultClub
+
   return (
     <div className="tm-club-switcher">
       <span>{t.currentClub}</span>
-      <select disabled={disabled} value={selectedClubId} onChange={event => onChange(event.target.value)}>
-        <option value="default">{t.defaultClub}</option>
-        {clubs.map(club => (
-          <option key={club.id} value={club.id}>{club.clubName || club.toastmasterId || club.id}</option>
-        ))}
-      </select>
+      {disabled ? (
+        <b className="tm-locked-club">{label}</b>
+      ) : (
+        <select value={selectedClubId} onChange={event => onChange(event.target.value)}>
+          <option value="default">{t.defaultClub}</option>
+          {clubs.map(club => (
+            <option key={club.id} value={club.id}>{club.clubName || club.toastmasterId || club.id}</option>
+          ))}
+        </select>
+      )}
       <small>{t.switchClubHint}</small>
+    </div>
+  )
+}
+
+function CurrentUserCard({ user, roleLabel, t }) {
+  if (!user) return null
+  return (
+    <div className="tm-current-user">
+      <span>{t.currentUser}</span>
+      <b>{user.email}</b>
+      <small>{roleLabel}</small>
     </div>
   )
 }
@@ -3146,6 +3174,7 @@ export default function ToastmastersVote() {
   const superAdmin = isSuperAdmin(user)
   const clubAdmin = isClubAdmin(user, settings)
   const canManageClubSettings = superAdmin || clubAdmin
+  const roleLabel = superAdmin ? appText.roleSuperAdmin : clubAdmin ? appText.roleClubAdmin : appText.roleUser
 
   useEffect(() => {
     if (!publicView && authReady && user && !canManageClubSettings && ['system', 'master'].includes(view)) {
@@ -3211,6 +3240,7 @@ export default function ToastmastersVote() {
         <div className="tm-brand">{appText.clubShort}</div>
         <LanguageToggle lang={lang} setLang={changeLang} t={appText} />
         <ClubSwitcher clubs={managedClubs} selectedClubId={selectedClubId} onChange={switchClub} t={appText} disabled={!superAdmin} />
+        <CurrentUserCard user={user} roleLabel={roleLabel} t={appText} />
         {isCloudConfigured && <button onClick={handleLogout}>{appText.logout}</button>}
         {nav.map(([key, label]) => (
           <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
