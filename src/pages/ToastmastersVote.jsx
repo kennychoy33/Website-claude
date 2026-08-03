@@ -798,23 +798,28 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
   )
 }
 
-function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus, t }) {
+function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus, t, superAdmin = false }) {
   const [cloudConfig, setCloudConfig] = useState(() => loadRuntimeCloudConfig())
+  const locked = !superAdmin
 
   function update(field, value) {
+    if (locked) return
     setSettings({ ...settings, [field]: value })
   }
 
   function updateCloudConfig(field, value) {
+    if (locked) return
     setCloudConfig({ ...cloudConfig, [field]: value })
   }
 
   function persistCloudConfig() {
+    if (locked) return
     saveRuntimeCloudConfig(cloudConfig)
     window.location.reload()
   }
 
   function updateAdmin(id, field, value) {
+    if (locked) return
     setSettings({
       ...settings,
       clubAdmins: (settings.clubAdmins || []).map(item => item.id === id ? { ...item, [field]: value } : item),
@@ -822,6 +827,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
   }
 
   function addAdmin() {
+    if (locked) return
     setSettings({
       ...settings,
       clubAdmins: [
@@ -832,6 +838,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
   }
 
   function removeAdmin(id) {
+    if (locked) return
     setSettings({
       ...settings,
       clubAdmins: (settings.clubAdmins || []).filter(item => item.id !== id),
@@ -839,6 +846,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
   }
 
   function updateTemplateRole(index, value) {
+    if (locked) return
     const nextRoles = [...(settings.agendaRoleTemplate || [])]
     const current = typeof nextRoles[index] === 'string' ? { roleName: nextRoles[index], time: '' } : nextRoles[index]
     nextRoles[index] = { ...current, roleName: value }
@@ -846,6 +854,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
   }
 
   function updateTemplateRoleTime(index, value) {
+    if (locked) return
     const nextRoles = [...(settings.agendaRoleTemplate || [])]
     const current = typeof nextRoles[index] === 'string' ? { roleName: nextRoles[index], time: '' } : nextRoles[index]
     nextRoles[index] = { ...current, time: value }
@@ -853,6 +862,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
   }
 
   function addTemplateRole() {
+    if (locked) return
     setSettings({
       ...settings,
       agendaRoleTemplate: [...(settings.agendaRoleTemplate || []), { roleName: '', time: '' }],
@@ -860,6 +870,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
   }
 
   function removeTemplateRole(index) {
+    if (locked) return
     setSettings({
       ...settings,
       agendaRoleTemplate: (settings.agendaRoleTemplate || []).filter((_, currentIndex) => currentIndex !== index),
@@ -867,6 +878,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
   }
 
   function readFile(event, field, nameField = '') {
+    if (locked) return
     const file = event.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
@@ -889,7 +901,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
           {syncStatus && <div className="tm-sync-badge"><b>{syncStatus}</b></div>}
         </div>
         <div className="tm-actions">
-          <button className="tm-gold" onClick={() => persistSettings(settings)}>{t.save}</button>
+          <button className="tm-gold" disabled={locked} onClick={() => persistSettings(settings)}>{t.save}</button>
         </div>
       </div>
 
@@ -901,28 +913,28 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
         <div className="tm-form-grid">
           <label>
             <span>{t.clubName}</span>
-            <input value={settings.clubName} onChange={event => update('clubName', event.target.value)} />
+            <input disabled={locked} value={settings.clubName} onChange={event => update('clubName', event.target.value)} />
           </label>
           <label>
             <span>{t.clubShortName}</span>
-            <input value={settings.clubShort} onChange={event => update('clubShort', event.target.value)} />
+            <input disabled={locked} value={settings.clubShort} onChange={event => update('clubShort', event.target.value)} />
           </label>
           <label>
             <span>{t.toastmasterId}</span>
-            <input value={settings.toastmasterId} onChange={event => update('toastmasterId', event.target.value)} />
+            <input disabled={locked} value={settings.toastmasterId} onChange={event => update('toastmasterId', event.target.value)} />
           </label>
           <label>
             <span>{t.username}</span>
-            <input value={settings.username} onChange={event => update('username', event.target.value)} />
+            <input disabled={locked} value={settings.username} onChange={event => update('username', event.target.value)} />
           </label>
           <label>
             <span>{t.adminName}</span>
-            <input value={settings.adminName} onChange={event => update('adminName', event.target.value)} />
+            <input disabled={locked} value={settings.adminName} onChange={event => update('adminName', event.target.value)} />
           </label>
         </div>
       </section>
 
-      <section className="tm-panel">
+      {superAdmin && <section className="tm-panel">
         <div className="tm-panel-title">
           <span className="tm-icon">☁</span>
           <h2>{t.cloudDbSettings}</h2>
@@ -939,7 +951,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
           </label>
         </div>
         <button className="tm-gold" onClick={persistCloudConfig}>{t.saveCloudConfig}</button>
-      </section>
+      </section>}
 
       <section className="tm-panel">
         <div className="tm-panel-title">
@@ -949,14 +961,14 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
         <div className="tm-upload-grid">
           <label className="tm-upload-box">
             <span>{t.logoUpload}</span>
-            <input type="file" accept="image/*" onChange={event => readFile(event, 'logoDataUrl')} />
+            <input disabled={locked} type="file" accept="image/*" onChange={event => readFile(event, 'logoDataUrl')} />
           </label>
           <div className="tm-logo-preview">
             {settings.logoDataUrl ? <img src={settings.logoDataUrl} alt={t.logoUpload} /> : <span>{t.clubShort}</span>}
           </div>
           <label className="tm-upload-box">
             <span>{t.agendaTemplate}</span>
-            <input type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={event => readFile(event, 'agendaTemplateDataUrl', 'agendaTemplateName')} />
+            <input disabled={locked} type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={event => readFile(event, 'agendaTemplateDataUrl', 'agendaTemplateName')} />
           </label>
           <div className="tm-template-preview">
             <b>{settings.agendaTemplateName || t.pending}</b>
@@ -976,17 +988,17 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
             return (
             <div key={`${templateRole.roleName}-${index}`} className="tm-template-role-row">
               <span>{index + 1}</span>
-              <input value={templateRole.roleName} onChange={event => updateTemplateRole(index, event.target.value)} />
-              <input value={templateRole.time || ''} onChange={event => updateTemplateRoleTime(index, event.target.value)} placeholder="min" />
-              <button className="tm-danger" onClick={() => removeTemplateRole(index)}>{t.remove}</button>
+              <input disabled={locked} value={templateRole.roleName} onChange={event => updateTemplateRole(index, event.target.value)} />
+              <input disabled={locked} value={templateRole.time || ''} onChange={event => updateTemplateRoleTime(index, event.target.value)} placeholder="min" />
+              {superAdmin && <button className="tm-danger" onClick={() => removeTemplateRole(index)}>{t.remove}</button>}
             </div>
             )
           })}
         </div>
-        <button className="tm-outline" onClick={addTemplateRole}>{t.addTemplateRole}</button>
+        {superAdmin && <button className="tm-outline" onClick={addTemplateRole}>{t.addTemplateRole}</button>}
       </section>
 
-      <section className="tm-panel">
+      {superAdmin && <section className="tm-panel">
         <div className="tm-panel-title">
           <span className="tm-icon">👤</span>
           <h2>{t.clubAdmins}</h2>
@@ -1010,7 +1022,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
           ))}
         </div>
         <button className="tm-outline" onClick={addAdmin}>{t.addClubAdmin}</button>
-      </section>
+      </section>}
 
       <section className="tm-panel tm-note-panel">
         <p>{t.accountNote}</p>
@@ -2873,11 +2885,11 @@ function LoginView({ lang, setLang, t, onLogin }) {
   )
 }
 
-function ClubSwitcher({ clubs, selectedClubId, onChange, t }) {
+function ClubSwitcher({ clubs, selectedClubId, onChange, t, disabled = false }) {
   return (
     <div className="tm-club-switcher">
       <span>{t.currentClub}</span>
-      <select value={selectedClubId} onChange={event => onChange(event.target.value)}>
+      <select disabled={disabled} value={selectedClubId} onChange={event => onChange(event.target.value)}>
         <option value="default">{t.defaultClub}</option>
         {clubs.map(club => (
           <option key={club.id} value={club.id}>{club.clubName || club.toastmasterId || club.id}</option>
@@ -3098,6 +3110,10 @@ export default function ToastmastersVote() {
   }
 
   async function persistSettings(next) {
+    if (!superAdmin) {
+      setSyncStatus(t.saveFailed)
+      return
+    }
     setSyncStatus(t.syncing)
     try {
       await saveSystemSettings(next)
@@ -3194,7 +3210,7 @@ export default function ToastmastersVote() {
       {!publicView && <aside className="tm-sidebar">
         <div className="tm-brand">{appText.clubShort}</div>
         <LanguageToggle lang={lang} setLang={changeLang} t={appText} />
-        <ClubSwitcher clubs={managedClubs} selectedClubId={selectedClubId} onChange={switchClub} t={appText} />
+        <ClubSwitcher clubs={managedClubs} selectedClubId={selectedClubId} onChange={switchClub} t={appText} disabled={!superAdmin} />
         {isCloudConfigured && <button onClick={handleLogout}>{appText.logout}</button>}
         {nav.map(([key, label]) => (
           <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
@@ -3208,7 +3224,7 @@ export default function ToastmastersVote() {
         </div>
       </aside>}
       <main className="tm-content">
-        {view === 'system' && canManageClubSettings && <SystemSettingsView settings={settings} setSettings={setSettings} persistSettings={persistSettings} syncStatus={syncStatus} t={appText} />}
+        {view === 'system' && canManageClubSettings && <SystemSettingsView settings={settings} setSettings={setSettings} persistSettings={persistSettings} syncStatus={syncStatus} t={appText} superAdmin={superAdmin} />}
         {view === 'master' && superAdmin && <MasterAdminView settings={settings} t={appText} onClubsChange={setManagedClubs} />}
         {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} meetingOps={meetingOps} spaceId={workspaceId} voteLink={effectiveVoteLink} />}
         {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={appText} />}
