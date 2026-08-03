@@ -230,6 +230,7 @@ const LANG = {
     toastmasterId: 'Toastmaster ID',
     adminName: '管理员姓名',
     username: 'User Name',
+    userId: 'User ID',
     systemSaved: '系统设定已保存',
     accountNote: '这里可以记录分会管理者资料。正式上线时，密码应由系统管理通过 Supabase Auth / Edge Function 建立，不建议长期保存明文密码。',
     masterNote: '系统管理是给最高管理者新建分会、分会管理者 ID 和密码使用。',
@@ -423,6 +424,7 @@ const LANG = {
     toastmasterId: 'Toastmaster ID',
     adminName: 'Admin Name',
     username: 'User Name',
+    userId: 'User ID',
     systemSaved: 'System settings saved',
     accountNote: 'Club admin details can be recorded here. In production, passwords should be provisioned by System Admin through Supabase Auth / Edge Function, not stored as long-term plain text.',
     masterNote: 'System Admin is for the owner to create clubs, club admin IDs, and initial passwords.',
@@ -935,7 +937,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
             <input disabled={locked} value={settings.toastmasterId} onChange={event => update('toastmasterId', event.target.value)} />
           </label>
           <label>
-            <span>{t.username}</span>
+            <span>{t.userId}</span>
             <input disabled={locked} value={settings.username} onChange={event => update('username', event.target.value)} />
           </label>
           <label>
@@ -1018,7 +1020,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
           <div className="tm-directory-head">
             <span>{t.toastmasterId}</span>
             <span>{t.email}</span>
-            <span>{t.username}</span>
+            <span>{t.userId}</span>
             <span>{t.password}</span>
             <span>{t.adminName}</span>
             <span>{t.action}</span>
@@ -1146,7 +1148,7 @@ function MasterAdminView({ settings, t, onClubsChange }) {
             <input value={draft.email} onChange={event => updateDraft('email', event.target.value)} type="email" />
           </label>
           <label>
-            <span>{t.username}</span>
+            <span>{t.userId}</span>
             <input value={draft.username} onChange={event => updateDraft('username', event.target.value)} />
           </label>
           <label>
@@ -1183,7 +1185,7 @@ function MasterAdminView({ settings, t, onClubsChange }) {
             <span>{t.clubName}</span>
             <span>{t.toastmasterId}</span>
             <span>{t.email}</span>
-            <span>{t.username}</span>
+            <span>{t.userId}</span>
             <span>{t.password}</span>
             <span>{t.adminName}</span>
             <span>{t.action}</span>
