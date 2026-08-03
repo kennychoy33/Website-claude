@@ -2674,7 +2674,12 @@ function normalizeState(next) {
 }
 
 function LoginView({ lang, setLang, t, onLogin }) {
-  const [toastmasterId, setToastmasterId] = useState('')
+  const loginClubs = useMemo(() => {
+    const savedClubs = loadManagedClubs()
+    if (savedClubs.length) return savedClubs
+    return [{ id: 'default', clubName: t.defaultClub, toastmasterId: 'default' }]
+  }, [t.defaultClub])
+  const [selectedClubId, setSelectedClubId] = useState(() => getActiveClubId() || loginClubs[0]?.id || 'default')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -2684,7 +2689,9 @@ function LoginView({ lang, setLang, t, onLogin }) {
     setBusy(true)
     setError('')
     try {
-      localStorage.setItem('tm-login-toastmaster-id', toastmasterId.trim())
+      const selectedClub = loginClubs.find(club => club.id === selectedClubId) || loginClubs[0]
+      localStorage.setItem('tm-login-toastmaster-id', selectedClub?.toastmasterId || selectedClubId)
+      setActiveClubId(selectedClub?.id || selectedClubId || 'default')
       const user = mode === 'signup'
         ? await signUpWithEmail(email, password)
         : await signInWithEmail(email, password)
@@ -2706,7 +2713,13 @@ function LoginView({ lang, setLang, t, onLogin }) {
         <p className="tm-login-note">{t.privateSpace}</p>
         <label>
           <span>{t.toastmasterLoginId}</span>
-          <input value={toastmasterId} onChange={e => setToastmasterId(e.target.value)} placeholder="CW01" />
+          <select value={selectedClubId} onChange={e => setSelectedClubId(e.target.value)}>
+            {loginClubs.map(club => (
+              <option key={club.id} value={club.id}>
+                {[club.toastmasterId, club.clubName].filter(Boolean).join(' - ') || club.id}
+              </option>
+            ))}
+          </select>
         </label>
         <label>
           <span>{t.email}</span>
@@ -2718,8 +2731,8 @@ function LoginView({ lang, setLang, t, onLogin }) {
         </label>
         {error && <p className="tm-error">{error}</p>}
         <div className="tm-login-actions">
-          <button disabled={busy || !toastmasterId || !email || !password} onClick={() => submit('login')}>{t.login}</button>
-          <button disabled={busy || !toastmasterId || !email || !password} className="tm-outline" onClick={() => submit('signup')}>{t.createAccount}</button>
+          <button disabled={busy || !selectedClubId || !email || !password} onClick={() => submit('login')}>{t.login}</button>
+          <button disabled={busy || !selectedClubId || !email || !password} className="tm-outline" onClick={() => submit('signup')}>{t.createAccount}</button>
         </div>
       </div>
     </div>
