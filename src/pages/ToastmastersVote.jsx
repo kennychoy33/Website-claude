@@ -171,7 +171,8 @@ const LANG = {
     duplicateVote: '这台设备已经投过票。',
     privateSpace: '登录后，每个分会和使用者都有自己的独立管理空间。',
     toastmasterLoginId: 'Toastmaster ID',
-    email: 'Email',
+    email: '登录 Email',
+    loginEmailHint: '请输入 Supabase 登录 Email，不是 Toastmaster ID。',
     password: '密码',
     login: '登录',
     createAccount: '建立账号',
@@ -363,7 +364,8 @@ const LANG = {
     duplicateVote: 'This device has already voted.',
     privateSpace: 'After login, every club and user has an independent management workspace.',
     toastmasterLoginId: 'Toastmaster ID',
-    email: 'Email',
+    email: 'Login Email',
+    loginEmailHint: 'Enter your Supabase login email, not the Toastmaster ID.',
     password: 'Password',
     login: 'Login',
     createAccount: 'Create Account',
@@ -2840,6 +2842,10 @@ function LoginView({ lang, setLang, t, onLogin }) {
   const [busy, setBusy] = useState(false)
 
   async function submit(mode) {
+    if (!email.includes('@')) {
+      setError(t.loginEmailHint)
+      return
+    }
     setBusy(true)
     setError('')
     try {
