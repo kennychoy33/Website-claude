@@ -840,7 +840,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
       ...settings,
       clubAdmins: [
         ...(settings.clubAdmins || []),
-        { id: `a${Date.now()}`, toastmasterId: '', username: '', password: '', name: '' },
+        { id: `a${Date.now()}`, toastmasterId: settings.toastmasterId || localStorage.getItem('tm-login-toastmaster-id') || getActiveClubId(), username: '', password: '', name: '' },
       ],
     })
   }
@@ -2898,6 +2898,7 @@ function ClubSwitcher({ clubs, selectedClubId, onChange, t, disabled = false }) 
     ? { clubName: t.defaultClub }
     : clubs.find(club => club.id === selectedClubId)
   const label = selectedClub?.clubName || selectedClub?.toastmasterId || selectedClubId || t.defaultClub
+  const toastmasterId = selectedClub?.toastmasterId || localStorage.getItem('tm-login-toastmaster-id') || selectedClubId || 'default'
 
   return (
     <div className="tm-club-switcher">
@@ -2912,6 +2913,7 @@ function ClubSwitcher({ clubs, selectedClubId, onChange, t, disabled = false }) 
           ))}
         </select>
       )}
+      <small>Toastmaster ID: {toastmasterId}</small>
       <small>{t.switchClubHint}</small>
     </div>
   )
@@ -3042,7 +3044,17 @@ export default function ToastmastersVote() {
       try {
         setActiveClubId(publicView ? publicClub : selectedClubId)
         const result = await loadSystemSettings(publicView ? publicSpace : '')
-        if (!ignore) setSettings(result.data)
+        if (!ignore) {
+          const fallbackToastmasterId = result.data.toastmasterId || localStorage.getItem('tm-login-toastmaster-id') || selectedClubId || 'default'
+          setSettings({
+            ...result.data,
+            toastmasterId: fallbackToastmasterId,
+            clubAdmins: (result.data.clubAdmins || []).map(admin => ({
+              ...admin,
+              toastmasterId: admin.toastmasterId || fallbackToastmasterId,
+            })),
+          })
+        }
       } catch {
         if (!ignore) setSettings({ clubName: t.club, clubShort: t.clubShort, toastmasterId: '', adminName: '', username: '', logoDataUrl: '', agendaTemplateName: '', agendaTemplateDataUrl: '', clubAdmins: [] })
       }

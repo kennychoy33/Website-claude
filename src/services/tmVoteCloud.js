@@ -1257,10 +1257,11 @@ function toSystemSettingsRow(settings, ownerId) {
 }
 
 function fromSystemSettingsRow(row) {
+  const club = getManagedClubMeta(row.club_id || getActiveClubId())
   return {
-    clubName: row.club_name || seedSystemSettings.clubName,
-    clubShort: row.club_short || seedSystemSettings.clubShort,
-    toastmasterId: row.toastmaster_id || '',
+    clubName: row.club_name || club?.clubName || seedSystemSettings.clubName,
+    clubShort: row.club_short || club?.clubShort || club?.clubName || seedSystemSettings.clubShort,
+    toastmasterId: row.toastmaster_id || club?.toastmasterId || '',
     adminName: row.admin_name || '',
     username: row.username || '',
     logoDataUrl: row.logo_data_url || '',
@@ -1271,11 +1272,12 @@ function fromSystemSettingsRow(row) {
 }
 
 function toClubAdminRow(admin, ownerId) {
+  const club = getManagedClubMeta()
   return {
     id: toPeopleCloudId(admin.id, ownerId),
     owner_id: ownerId,
     club_id: getActiveClubRowId(),
-    toastmaster_id: admin.toastmasterId,
+    toastmaster_id: admin.toastmasterId || club?.toastmasterId || getActiveClubId(),
     username: admin.username,
     password_hint: admin.password,
     name: admin.name,
@@ -1283,9 +1285,10 @@ function toClubAdminRow(admin, ownerId) {
 }
 
 function fromClubAdminRow(row) {
+  const club = getManagedClubMeta(row.club_id || getActiveClubId())
   return {
     id: fromPeopleCloudId(row.id),
-    toastmasterId: row.toastmaster_id || '',
+    toastmasterId: row.toastmaster_id || club?.toastmasterId || getActiveClubId(),
     username: row.username || '',
     password: row.password_hint || '',
     name: row.name || '',
