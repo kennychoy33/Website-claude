@@ -165,14 +165,15 @@ const LANG = {
     loadFailed: '云端读取失败，已切换到本地模式。',
     saveFailed: '保存失败，请检查网络或 Supabase 设置。',
     duplicateVote: '这台设备已经投过票。',
-    privateSpace: '登录后，每个使用者都有自己的独立投票空间。',
+    privateSpace: '登录后，每个分会和使用者都有自己的独立管理空间。',
+    toastmasterLoginId: 'Toastmaster ID',
     email: 'Email',
     password: '密码',
     login: '登录',
     createAccount: '建立账号',
     logout: '登出',
-    loginTitle: 'Toastmasters 投票系统',
-    loginSubtitle: '登录你的独立空间，管理自己的会议、候选人和历史票数。',
+    loginTitle: 'Toastmasters 管理系统',
+    loginSubtitle: '登录你的独立空间，管理分会、会员、例会、议程、投票和历史记录。',
     superAdminHint: '系统最高管理员 Email: kenny@smartouch.com.my。请用这个 Email 建立账号或登录。',
     membersTitle: '会员资料库',
     guestsTitle: '嘉宾资料库',
@@ -347,14 +348,15 @@ const LANG = {
     loadFailed: 'Cloud loading failed. Switched to local mode.',
     saveFailed: 'Save failed. Please check network or Supabase settings.',
     duplicateVote: 'This device has already voted.',
-    privateSpace: 'After login, every user has an independent voting workspace.',
+    privateSpace: 'After login, every club and user has an independent management workspace.',
+    toastmasterLoginId: 'Toastmaster ID',
     email: 'Email',
     password: 'Password',
     login: 'Login',
     createAccount: 'Create Account',
     logout: 'Logout',
-    loginTitle: 'Toastmasters Voting System',
-    loginSubtitle: 'Sign in to manage your own meetings, candidates, and voting history.',
+    loginTitle: 'Toastmasters Management System',
+    loginSubtitle: 'Sign in to manage clubs, members, meetings, agendas, voting, and history.',
     superAdminHint: 'System Super Admin Email: kenny@smartouch.com.my. Create an account or log in with this email.',
     membersTitle: 'Member Directory',
     guestsTitle: 'Guest Directory',
@@ -2672,6 +2674,7 @@ function normalizeState(next) {
 }
 
 function LoginView({ lang, setLang, t, onLogin }) {
+  const [toastmasterId, setToastmasterId] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -2681,6 +2684,7 @@ function LoginView({ lang, setLang, t, onLogin }) {
     setBusy(true)
     setError('')
     try {
+      localStorage.setItem('tm-login-toastmaster-id', toastmasterId.trim())
       const user = mode === 'signup'
         ? await signUpWithEmail(email, password)
         : await signInWithEmail(email, password)
@@ -2695,11 +2699,15 @@ function LoginView({ lang, setLang, t, onLogin }) {
   return (
     <div className="tm-login-page">
       <div className="tm-login-card">
-        <div className="tm-brand tm-login-brand">TM Vote</div>
+        <div className="tm-brand tm-login-brand">Toastmasters</div>
         <LanguageToggle lang={lang} setLang={setLang} t={t} />
         <h1>{t.loginTitle}</h1>
         <p>{t.loginSubtitle}</p>
         <p className="tm-login-note">{t.privateSpace}</p>
+        <label>
+          <span>{t.toastmasterLoginId}</span>
+          <input value={toastmasterId} onChange={e => setToastmasterId(e.target.value)} placeholder="CW01" />
+        </label>
         <label>
           <span>{t.email}</span>
           <input value={email} onChange={e => setEmail(e.target.value)} type="email" />
@@ -2710,8 +2718,8 @@ function LoginView({ lang, setLang, t, onLogin }) {
         </label>
         {error && <p className="tm-error">{error}</p>}
         <div className="tm-login-actions">
-          <button disabled={busy || !email || !password} onClick={() => submit('login')}>{t.login}</button>
-          <button disabled={busy || !email || !password} className="tm-outline" onClick={() => submit('signup')}>{t.createAccount}</button>
+          <button disabled={busy || !toastmasterId || !email || !password} onClick={() => submit('login')}>{t.login}</button>
+          <button disabled={busy || !toastmasterId || !email || !password} className="tm-outline" onClick={() => submit('signup')}>{t.createAccount}</button>
         </div>
       </div>
     </div>
@@ -2997,7 +3005,7 @@ export default function ToastmastersVote() {
     return (
       <div className={`tm-page ${publicView ? 'public' : ''}`}>
         {!publicView && <aside className="tm-sidebar">
-          <div className="tm-brand">TM Vote</div>
+          <div className="tm-brand">Toastmasters</div>
           <LanguageToggle lang={lang} setLang={changeLang} t={appText} />
         </aside>}
         <main className="tm-content">
