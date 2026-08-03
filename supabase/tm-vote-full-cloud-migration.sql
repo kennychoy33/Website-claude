@@ -103,6 +103,7 @@ alter table public.tm_club_admins
   add column if not exists owner_id uuid references auth.users(id) on delete cascade,
   add column if not exists club_id text not null default 'default',
   add column if not exists toastmaster_id text,
+  add column if not exists email text,
   add column if not exists username text,
   add column if not exists password_hint text,
   add column if not exists name text,

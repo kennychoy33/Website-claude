@@ -316,7 +316,7 @@ export const seedSystemSettings = {
     { roleName: 'General Evaluator', time: '10' },
   ],
   clubAdmins: [
-    { id: 'a1', toastmasterId: '', username: '', password: '', name: '' },
+    { id: 'a1', toastmasterId: '', email: '', username: '', password: '', name: '' },
   ],
 }
 
@@ -1278,6 +1278,7 @@ function toClubAdminRow(admin, ownerId) {
     owner_id: ownerId,
     club_id: getActiveClubRowId(),
     toastmaster_id: admin.toastmasterId || club?.toastmasterId || getActiveClubId(),
+    email: admin.email || '',
     username: admin.username,
     password_hint: admin.password,
     name: admin.name,
@@ -1289,6 +1290,7 @@ function fromClubAdminRow(row) {
   return {
     id: fromPeopleCloudId(row.id),
     toastmasterId: row.toastmaster_id || club?.toastmasterId || getActiveClubId(),
+    email: row.email || '',
     username: row.username || '',
     password: row.password_hint || '',
     name: row.name || '',

@@ -66,7 +66,8 @@ function isClubAdmin(user, settings = {}) {
   const email = String(user?.email || '').toLowerCase()
   if (!email) return false
   const admins = settings.clubAdmins || []
-  return [settings.username, settings.adminEmail, ...admins.flatMap(item => [item.username, item.email])]
+  const clubs = loadManagedClubs()
+  return [settings.username, settings.adminEmail, ...admins.flatMap(item => [item.username, item.email]), ...clubs.flatMap(item => [item.username, item.email])]
     .filter(Boolean)
     .some(value => String(value).toLowerCase() === email)
 }
@@ -245,7 +246,7 @@ const LANG = {
     clubCreated: '分会已加入',
     clubListSaved: '分会列表已保存',
     noClub: '还没有分会记录',
-    createClubHint: '请填写分会名称、User Name 和 Password',
+    createClubHint: '请填写分会名称、Login Email、User Name 和 Password',
     clubList: '分会列表',
     newMeeting: '新建例会',
     editMeeting: '修改例会',
@@ -438,7 +439,7 @@ const LANG = {
     clubCreated: 'Club added',
     clubListSaved: 'Club list saved',
     noClub: 'No club records yet',
-    createClubHint: 'Please enter club name, user name, and password',
+    createClubHint: 'Please enter club name, login email, user name, and password',
     clubList: 'Club List',
     newMeeting: 'New Meeting',
     editMeeting: 'Edit Meeting',
@@ -842,7 +843,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
       ...settings,
       clubAdmins: [
         ...(settings.clubAdmins || []),
-        { id: `a${Date.now()}`, toastmasterId: settings.toastmasterId || localStorage.getItem('tm-login-toastmaster-id') || getActiveClubId(), username: '', password: '', name: '' },
+        { id: `a${Date.now()}`, toastmasterId: settings.toastmasterId || localStorage.getItem('tm-login-toastmaster-id') || getActiveClubId(), email: '', username: '', password: '', name: '' },
       ],
     })
   }
@@ -1016,6 +1017,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
         <div className="tm-directory-table admins">
           <div className="tm-directory-head">
             <span>{t.toastmasterId}</span>
+            <span>{t.email}</span>
             <span>{t.username}</span>
             <span>{t.password}</span>
             <span>{t.adminName}</span>
@@ -1024,6 +1026,7 @@ function SystemSettingsView({ settings, setSettings, persistSettings, syncStatus
           {(settings.clubAdmins || []).map(item => (
             <div className="tm-directory-row" key={item.id}>
               <input value={item.toastmasterId} onChange={event => updateAdmin(item.id, 'toastmasterId', event.target.value)} />
+              <input value={item.email || ''} onChange={event => updateAdmin(item.id, 'email', event.target.value)} />
               <input value={item.username} onChange={event => updateAdmin(item.id, 'username', event.target.value)} />
               <input value={item.password} type="password" onChange={event => updateAdmin(item.id, 'password', event.target.value)} />
               <input value={item.name} onChange={event => updateAdmin(item.id, 'name', event.target.value)} />
@@ -1054,6 +1057,7 @@ function MasterAdminView({ settings, t, onClubsChange }) {
   const [draft, setDraft] = useState({
     clubName: '',
     toastmasterId: '',
+    email: '',
     username: '',
     password: '',
     adminName: '',
@@ -1065,7 +1069,7 @@ function MasterAdminView({ settings, t, onClubsChange }) {
   }
 
   function createClub() {
-    if (!draft.clubName || !draft.username || !draft.password) {
+    if (!draft.clubName || !draft.email || !draft.email.includes('@') || !draft.username || !draft.password) {
       setMessage(t.createClubHint)
       document.getElementById('tm-create-club-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       return
@@ -1077,7 +1081,7 @@ function MasterAdminView({ settings, t, onClubsChange }) {
     setClubs(nextClubs)
     onClubsChange?.(nextClubs)
     localStorage.setItem('tm-master-clubs', JSON.stringify(nextClubs))
-    setDraft({ clubName: '', toastmasterId: '', username: '', password: '', adminName: '' })
+    setDraft({ clubName: '', toastmasterId: '', email: '', username: '', password: '', adminName: '' })
     setMessage(t.clubCreated)
   }
 
@@ -1096,15 +1100,15 @@ function MasterAdminView({ settings, t, onClubsChange }) {
 
   function saveClubList() {
     let nextClubs = clubs
-    if (draft.clubName || draft.toastmasterId || draft.username || draft.password || draft.adminName) {
-      if (!draft.clubName || !draft.username || !draft.password) {
+    if (draft.clubName || draft.toastmasterId || draft.email || draft.username || draft.password || draft.adminName) {
+      if (!draft.clubName || !draft.email || !draft.email.includes('@') || !draft.username || !draft.password) {
         setMessage(t.createClubHint)
         return
       }
       nextClubs = [...clubs, { ...draft, id: `club${Date.now()}` }]
       setClubs(nextClubs)
       onClubsChange?.(nextClubs)
-      setDraft({ clubName: '', toastmasterId: '', username: '', password: '', adminName: '' })
+      setDraft({ clubName: '', toastmasterId: '', email: '', username: '', password: '', adminName: '' })
     }
     localStorage.setItem('tm-master-clubs', JSON.stringify(nextClubs))
     setMessage(t.clubListSaved)
@@ -1136,6 +1140,10 @@ function MasterAdminView({ settings, t, onClubsChange }) {
           <label>
             <span>{t.toastmasterId}</span>
             <input value={draft.toastmasterId} onChange={event => updateDraft('toastmasterId', event.target.value)} />
+          </label>
+          <label>
+            <span>{t.email}</span>
+            <input value={draft.email} onChange={event => updateDraft('email', event.target.value)} type="email" />
           </label>
           <label>
             <span>{t.username}</span>
@@ -1174,6 +1182,7 @@ function MasterAdminView({ settings, t, onClubsChange }) {
           <div className="tm-club-table-head">
             <span>{t.clubName}</span>
             <span>{t.toastmasterId}</span>
+            <span>{t.email}</span>
             <span>{t.username}</span>
             <span>{t.password}</span>
             <span>{t.adminName}</span>
@@ -1183,6 +1192,7 @@ function MasterAdminView({ settings, t, onClubsChange }) {
             <div className="tm-club-table-row" key={club.id}>
               <input value={club.clubName} onChange={event => updateClub(club.id, 'clubName', event.target.value)} />
               <input value={club.toastmasterId} onChange={event => updateClub(club.id, 'toastmasterId', event.target.value)} />
+              <input value={club.email || ''} onChange={event => updateClub(club.id, 'email', event.target.value)} type="email" />
               <input value={club.username} onChange={event => updateClub(club.id, 'username', event.target.value)} />
               <input type="password" value={club.password} onChange={event => updateClub(club.id, 'password', event.target.value)} />
               <input value={club.adminName} onChange={event => updateClub(club.id, 'adminName', event.target.value)} />
