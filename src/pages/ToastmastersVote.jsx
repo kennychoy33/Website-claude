@@ -62,6 +62,15 @@ function isSuperAdmin(user) {
   return SUPER_ADMIN_EMAILS.includes(String(user?.email || '').toLowerCase())
 }
 
+function isClubAdmin(user, settings = {}) {
+  const email = String(user?.email || '').toLowerCase()
+  if (!email) return false
+  const admins = settings.clubAdmins || []
+  return [settings.username, settings.adminEmail, ...admins.flatMap(item => [item.username, item.email])]
+    .filter(Boolean)
+    .some(value => String(value).toLowerCase() === email)
+}
+
 const LANG = {
   zh: {
     navAdmin: '投票设置',
@@ -2691,7 +2700,6 @@ function LoginView({ lang, setLang, t, onLogin }) {
         <h1>{t.loginTitle}</h1>
         <p>{t.loginSubtitle}</p>
         <p className="tm-login-note">{t.privateSpace}</p>
-        <p className="tm-login-note">{t.superAdminHint}</p>
         <label>
           <span>{t.email}</span>
           <input value={email} onChange={e => setEmail(e.target.value)} type="email" />
@@ -2965,6 +2973,17 @@ export default function ToastmastersVote() {
     ['master', t.navMaster],
   ], [t])
   const superAdmin = isSuperAdmin(user)
+  const clubAdmin = isClubAdmin(user, settings)
+  const canManageClubSettings = superAdmin || clubAdmin
+
+  useEffect(() => {
+    if (!publicView && authReady && user && !canManageClubSettings && ['system', 'master'].includes(view)) {
+      setView('meeting')
+    }
+    if (!publicView && authReady && user && !superAdmin && view === 'master') {
+      setView(canManageClubSettings ? 'system' : 'meeting')
+    }
+  }, [authReady, user, publicView, view, superAdmin, canManageClubSettings])
 
   if (!authReady) {
     return <div className="tm-success-card"><h2>{appText.syncing}</h2></div>
@@ -3027,14 +3046,14 @@ export default function ToastmastersVote() {
         ))}
         <div className="tm-sidebar-bottom">
           {bottomNav
-            .filter(([key]) => key !== 'master' || superAdmin)
+            .filter(([key]) => (key !== 'system' || canManageClubSettings) && (key !== 'master' || superAdmin))
             .map(([key, label]) => (
             <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
           ))}
         </div>
       </aside>}
       <main className="tm-content">
-        {view === 'system' && <SystemSettingsView settings={settings} setSettings={setSettings} persistSettings={persistSettings} syncStatus={syncStatus} t={appText} />}
+        {view === 'system' && canManageClubSettings && <SystemSettingsView settings={settings} setSettings={setSettings} persistSettings={persistSettings} syncStatus={syncStatus} t={appText} />}
         {view === 'master' && superAdmin && <MasterAdminView settings={settings} t={appText} onClubsChange={setManagedClubs} />}
         {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} meetingOps={meetingOps} spaceId={workspaceId} voteLink={effectiveVoteLink} />}
         {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={appText} />}
