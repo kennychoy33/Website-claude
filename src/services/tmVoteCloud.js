@@ -30,6 +30,15 @@ function getClubStorageItem(key) {
   return localStorage.getItem(clubKey(key)) || (getActiveClubId() === 'default' ? localStorage.getItem(key) : null)
 }
 
+function getManagedClubMeta(clubId = getActiveClubId()) {
+  try {
+    const clubs = JSON.parse(localStorage.getItem('tm-master-clubs') || '[]')
+    return clubs.find(club => club.id === clubId) || null
+  } catch {
+    return null
+  }
+}
+
 const envCloudConfig = {
   url: import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL,
   anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY,
@@ -311,18 +320,70 @@ export const seedSystemSettings = {
   ],
 }
 
+function getBlankVoteState() {
+  return {
+    meeting: {
+      id: getMeetingId(),
+      number: '',
+      date: '',
+      theme: '',
+      word: '',
+      closeTime: '',
+      status: 'draft',
+      link: getPublicVoteUrl(),
+    },
+    prepared: [],
+    impromptu: [],
+    evaluator: [],
+    history: [],
+  }
+}
+
+function getBlankPeopleState() {
+  return { members: [], guests: [] }
+}
+
+function getBlankSystemSettings() {
+  const club = getManagedClubMeta()
+  return {
+    ...seedSystemSettings,
+    clubName: club?.clubName || '',
+    clubShort: club?.clubShort || club?.clubName || '',
+    toastmasterId: club?.toastmasterId || '',
+    adminName: club?.adminName || '',
+    username: club?.username || '',
+    logoDataUrl: '',
+    agendaTemplateName: '',
+    agendaTemplateDataUrl: '',
+    clubAdmins: [],
+  }
+}
+
+function getDefaultVoteState() {
+  return getActiveClubId() === 'default' ? seedState : getBlankVoteState()
+}
+
+function getDefaultPeopleState() {
+  return getActiveClubId() === 'default' ? seedPeopleState : getBlankPeopleState()
+}
+
+function getDefaultSystemSettings() {
+  return getActiveClubId() === 'default' ? seedSystemSettings : getBlankSystemSettings()
+}
+
 export function loadLocalState() {
   try {
     const saved = getClubStorageItem(TM_VOTE_STORAGE_KEY)
-    const state = saved ? JSON.parse(saved) : seedState
+    const state = saved ? JSON.parse(saved) : getDefaultVoteState()
     return {
       ...state,
       meeting: { ...state.meeting, link: getPublicVoteUrl() },
     }
   } catch {
+    const fallback = getDefaultVoteState()
     return {
-      ...seedState,
-      meeting: { ...seedState.meeting, link: getPublicVoteUrl() },
+      ...fallback,
+      meeting: { ...fallback.meeting, link: getPublicVoteUrl() },
     }
   }
 }
@@ -337,9 +398,9 @@ export function saveLocalState(next) {
 export function loadLocalPeople() {
   try {
     const saved = getClubStorageItem(`${TM_VOTE_STORAGE_KEY}-people`)
-    return saved ? JSON.parse(saved) : seedPeopleState
+    return saved ? JSON.parse(saved) : getDefaultPeopleState()
   } catch {
-    return seedPeopleState
+    return getDefaultPeopleState()
   }
 }
 
@@ -363,9 +424,9 @@ export function saveLocalMeetingOps(next) {
 export function loadLocalSystemSettings() {
   try {
     const saved = getClubStorageItem(`${TM_VOTE_STORAGE_KEY}-system-settings`)
-    return saved ? { ...seedSystemSettings, ...JSON.parse(saved) } : seedSystemSettings
+    return saved ? { ...getDefaultSystemSettings(), ...JSON.parse(saved) } : getDefaultSystemSettings()
   } catch {
-    return seedSystemSettings
+    return getDefaultSystemSettings()
   }
 }
 
@@ -405,7 +466,7 @@ export async function loadSystemSettings(spaceId = '') {
   }
 
   if (error) throw error
-  if (!data) return { data: seedSystemSettings, source: 'cloud' }
+  if (!data) return { data: getDefaultSystemSettings(), source: 'cloud' }
 
   let clubAdmins = seedSystemSettings.clubAdmins
   if (user && !spaceId) {
@@ -758,11 +819,12 @@ export async function loadVoteState(spaceId = '', clubId = getActiveClubId(), ex
 
   if (!meeting) {
     if (spaceId) {
+      const blankState = getBlankVoteState()
       return {
         data: {
-          ...seedState,
+          ...blankState,
           meeting: {
-            ...seedState.meeting,
+            ...blankState.meeting,
             id: meetingId,
             number: '',
             theme: '',
@@ -777,9 +839,16 @@ export async function loadVoteState(spaceId = '', clubId = getActiveClubId(), ex
       }
     }
     if (!user) return { data: loadLocalState(), source: 'local' }
-    await saveVoteState(seedState)
-    return loadVoteState(user.id)
+    return { data: getDefaultVoteState(), source: 'cloud' }
   }
+
+  const historyQuery = readClient
+    .from('tm_winner_history')
+    .select('*')
+    .eq('owner_id', activeSpace)
+    .eq('club_id', clubId || 'default')
+    .order('meeting_date', { ascending: false })
+    .limit(20)
 
   const [{ data: candidates, error: candidateError }, { data: history, error: historyError }] = await Promise.all([
     readClient
@@ -787,11 +856,7 @@ export async function loadVoteState(spaceId = '', clubId = getActiveClubId(), ex
       .select('*')
       .eq('meeting_id', meeting.id)
       .order('sort_order', { ascending: true }),
-    readClient
-      .from('tm_winner_history')
-      .select('*')
-      .order('meeting_date', { ascending: false })
-      .limit(20),
+    historyQuery,
   ])
 
   if (candidateError) throw candidateError
