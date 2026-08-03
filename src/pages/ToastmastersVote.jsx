@@ -195,6 +195,11 @@ const LANG = {
     importRole: '导入例会职务',
     peopleSaved: '会员/嘉宾已保存',
     importChungHwaList: '导入中化名单',
+    importWhatsappList: '导入名单',
+    pastePeopleList: '粘贴 WhatsApp 名单',
+    pastePeopleListHint: '把 WhatsApp 名单贴在这里，系统会自动判断会员和嘉宾，并加入当前分会资料库。',
+    importAsMemberHint: '含有会员、🆓、免费、member 会导入会员；含有嘉宾、guest、来宾、RM、✅ 会导入嘉宾；没有关键字默认导入会员。',
+    listImported: '名单已导入',
     meetingSaved: '例会资料已保存',
     attendanceTitle: '出席记录',
     rolesTitle: '职务分配',
@@ -378,6 +383,11 @@ const LANG = {
     importRole: 'Import Meeting Role',
     peopleSaved: 'Members / guests saved',
     importChungHwaList: 'Import Chung Hwa List',
+    importWhatsappList: 'Import List',
+    pastePeopleList: 'Paste WhatsApp List',
+    pastePeopleListHint: 'Paste a WhatsApp name list here. The system will detect members and guests, then add them to the current club directory.',
+    importAsMemberHint: 'Lines with member, free, or 🆓 import as members. Lines with guest, visitor, RM, or ✅ import as guests. Lines without keywords import as members.',
+    listImported: 'List imported',
     meetingSaved: 'Meeting details saved',
     attendanceTitle: 'Attendance',
     rolesTitle: 'Role Assignment',
@@ -1372,6 +1382,9 @@ function HistoryView({ data, t }) {
 }
 
 function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
+  const [importOpen, setImportOpen] = useState(false)
+  const [importText, setImportText] = useState('')
+
   function updateMember(id, field, value) {
     setPeople({
       ...people,
@@ -1447,6 +1460,52 @@ function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
     })
   }
 
+  function applyPeopleImport() {
+    const parsed = parsePeoplePaste(importText)
+    const currentMemberNames = new Set(people.members.map(item => normalizePersonName(item.name)))
+    const currentGuestNames = new Set(people.guests.map(item => normalizePersonName(item.name)))
+    const newMembers = []
+    const newGuests = []
+
+    parsed.forEach((item, index) => {
+      const normalizedName = normalizePersonName(item.name)
+      if (!normalizedName || currentMemberNames.has(normalizedName) || currentGuestNames.has(normalizedName)) return
+      if (item.type === 'guest') {
+        currentGuestNames.add(normalizedName)
+        newGuests.push({
+          id: `g${Date.now()}${index}`,
+          name: item.name,
+          email: item.email || '',
+          phone: item.phone || '',
+          introducedBy: '',
+          visitDate: '',
+          notes: item.notes || '',
+        })
+      } else {
+        currentMemberNames.add(normalizedName)
+        newMembers.push({
+          id: `m${Date.now()}${index}`,
+          name: item.name,
+          englishName: '',
+          email: item.email || '',
+          phone: item.phone || '',
+          pathway: '',
+          level: '',
+          status: 'active',
+          joinedDate: '',
+        })
+      }
+    })
+
+    setPeople({
+      ...people,
+      members: [...people.members, ...newMembers],
+      guests: [...people.guests, ...newGuests],
+    })
+    setImportOpen(false)
+    setImportText('')
+  }
+
   return (
     <div className="tm-main-column">
       <div className="tm-screen-head">
@@ -1457,11 +1516,32 @@ function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
         </div>
         <div className="tm-actions">
           <button className="tm-gold" onClick={() => persistPeople(people)}>{t.save}</button>
+          <button onClick={() => setImportOpen(true)}>{t.importWhatsappList}</button>
           <button onClick={importChungHwaList}>{t.importChungHwaList}</button>
           <button onClick={addMember}>{t.addMember}</button>
           <button onClick={addGuest}>{t.addGuest}</button>
         </div>
       </div>
+
+      {importOpen && (
+        <div className="tm-modal-backdrop">
+          <div className="tm-modal">
+            <h2>{t.pastePeopleList}</h2>
+            <p>{t.pastePeopleListHint}</p>
+            <p className="tm-muted">{t.importAsMemberHint}</p>
+            <textarea
+              value={importText}
+              onChange={event => setImportText(event.target.value)}
+              rows={12}
+              placeholder={'1. Jenny 🆓\n2. Kenny ✅RM60\n3. Alice Guest RM30'}
+            />
+            <div className="tm-modal-actions">
+              <button onClick={applyPeopleImport} disabled={!importText.trim()}>{t.applyImport}</button>
+              <button className="tm-outline" onClick={() => setImportOpen(false)}>{t.cancel}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className="tm-panel">
         <div className="tm-panel-title">
@@ -1527,6 +1607,60 @@ function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
       </section>
     </div>
   )
+}
+
+function normalizePersonName(name = '') {
+  return String(name || '').replace(/\s+/g, '').toLowerCase()
+}
+
+function cleanImportedName(raw = '') {
+  return String(raw || '')
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/[✅☑️✔️🆓❣️❤️💰📅🕚🌍]/g, ' ')
+    .replace(/\bRM\s*\d+(?:\.\d+)?\b/gi, ' ')
+    .replace(/\+\s*\d+/g, ' ')
+    .replace(/[【\[].*?[】\]]/g, ' ')
+    .replace(/[()（）].*?[()）]/g, ' ')
+    .replace(/[：:，,;；|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function parsePeoplePaste(text = '') {
+  const records = []
+  const lines = String(text || '')
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+
+  lines.forEach(line => {
+    const withoutNumber = line
+      .replace(/^\s*\d+\s*[.)、．]?\s*/g, '')
+      .replace(/^\s*[-*•]\s*/g, '')
+      .replace(/^\s*[⁠\u200b\u200c\u200d]+\s*/g, '')
+      .trim()
+    if (!withoutNumber) return
+    const email = withoutNumber.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || ''
+    const phone = withoutNumber.match(/(?:\+?6?0|01)\d[\d -]{6,}/)?.[0]?.trim() || ''
+    const guestLike = /嘉宾|嘉賓|来宾|來賓|guest|visitor|来访|來訪|rm\s*\d+|✅/i.test(withoutNumber)
+    const memberLike = /会员|會員|member|free|免费|免費|🆓/i.test(withoutNumber)
+    const type = guestLike && !memberLike ? 'guest' : 'member'
+    const namePart = withoutNumber
+      .replace(email, '')
+      .replace(phone, '')
+      .split(/✅|🆓|RM\s*\d+|rm\s*\d+|会员|會員|嘉宾|嘉賓|guest|visitor|来宾|來賓/i)[0]
+    const name = cleanImportedName(namePart)
+    if (!name || /^\d+$/.test(name)) return
+    records.push({
+      type,
+      name,
+      email,
+      phone,
+      notes: type === 'guest' ? withoutNumber : '',
+    })
+  })
+
+  return records
 }
 
 function personLabel(people, type, id) {
