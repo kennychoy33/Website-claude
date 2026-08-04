@@ -79,6 +79,7 @@ const LANG = {
     navMaster: '系统管理',
     navPeople: '会员嘉宾',
     navMeeting: '例会管理',
+    navTimer: '计时员',
     navVote: '投票页面',
     navShare: '分享海报',
     navResults: '结果统计',
@@ -278,6 +279,7 @@ const LANG = {
     navMaster: 'System Admin',
     navPeople: 'Members & Guests',
     navMeeting: 'Meeting & Agenda',
+    navTimer: 'Timer',
     navVote: 'Voting Page',
     navShare: 'Share Poster',
     navResults: 'Results',
@@ -1428,6 +1430,244 @@ function Bar({ item, max }) {
       <span>{item.name}</span>
       <div><i style={{ width: `${(item.votes / max) * 100}%` }} /></div>
       <b>{item.votes}</b>
+    </div>
+  )
+}
+
+function timerRecordKey(meetingId) {
+  return `tm-timer-records-${meetingId || 'current'}`
+}
+
+function parseTimerMinutes(value = '', fallback = 3) {
+  const nums = String(value || '').match(/\d+(\.\d+)?/g)?.map(Number).filter(num => Number.isFinite(num)) || []
+  if (!nums.length) return { min: fallback, yellow: fallback, red: fallback }
+  if (nums.length === 1) return { min: Math.max(0, nums[0] * 0.8), yellow: Math.max(0, nums[0] * 0.9), red: nums[0] }
+  const min = nums[0]
+  const red = nums[nums.length - 1]
+  const yellow = min + ((red - min) / 2)
+  return { min, yellow, red }
+}
+
+function timerTargets(item = {}) {
+  const key = canonicalAgendaRoleKey(item.roleName || item.id || '')
+  const summary = String(item.summary || '')
+  if (key.startsWith('prepared-') || /prepared|备稿|演说|演讲/i.test(summary)) return { min: 5, yellow: 6, red: 7 }
+  if (key.startsWith('topics-') || /table topics speaker|即席讲员/i.test(summary)) return { min: 1, yellow: 1.5, red: 2 }
+  if (key.startsWith('evaluator-') || /^evaluator/i.test(item.roleName || '') || /evaluation|评论|评估/i.test(summary)) return { min: 2, yellow: 2.5, red: 3 }
+  return parseTimerMinutes(item.duration || item.time, 3)
+}
+
+function formatTimer(seconds) {
+  const total = Math.max(0, Math.floor(seconds || 0))
+  const minutes = Math.floor(total / 60)
+  const secs = total % 60
+  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
+
+function timerLight(elapsedSeconds, targets) {
+  const elapsedMinutes = (elapsedSeconds || 0) / 60
+  if (elapsedMinutes >= targets.red) return { key: 'red', label: 'Red', text: '红灯' }
+  if (elapsedMinutes >= targets.yellow) return { key: 'yellow', label: 'Yellow', text: '黄灯' }
+  if (elapsedMinutes >= targets.min) return { key: 'green', label: 'Green', text: '青灯' }
+  return { key: 'idle', label: 'Ready', text: '准备' }
+}
+
+function TimerView({ data, people, meetingOps, settings, t }) {
+  const uiLang = t.langLabel === 'Language' ? 'en' : 'zh'
+  const agendaRows = standardAgendaScheduleRows(agendaRowsFromTemplate(settings, meetingOps.roles), people, data, uiLang)
+  const flowItems = agendaRows.filter(item => !item.section)
+  const firstId = flowItems[0]?.id || ''
+  const [activeId, setActiveId] = useState(firstId)
+  const [baseElapsed, setBaseElapsed] = useState(0)
+  const [startedAt, setStartedAt] = useState(null)
+  const [now, setNow] = useState(Date.now())
+  const [records, setRecords] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(timerRecordKey(data.meeting?.id)) || '[]')
+    } catch {
+      return []
+    }
+  })
+  const activeItem = flowItems.find(item => item.id === activeId) || flowItems[0] || {}
+  const activeTargets = timerTargets(activeItem)
+  const elapsed = startedAt ? baseElapsed + ((now - startedAt) / 1000) : baseElapsed
+  const light = timerLight(elapsed, activeTargets)
+  const progress = Math.min(100, (elapsed / Math.max(1, activeTargets.red * 60)) * 100)
+
+  useEffect(() => {
+    if (!activeId && firstId) setActiveId(firstId)
+  }, [activeId, firstId])
+
+  useEffect(() => {
+    if (!startedAt) return undefined
+    const timer = setInterval(() => setNow(Date.now()), 250)
+    return () => clearInterval(timer)
+  }, [startedAt])
+
+  useEffect(() => {
+    setRecords(() => {
+      try {
+        return JSON.parse(localStorage.getItem(timerRecordKey(data.meeting?.id)) || '[]')
+      } catch {
+        return []
+      }
+    })
+    setActiveId(firstId)
+    setBaseElapsed(0)
+    setStartedAt(null)
+  }, [data.meeting?.id, firstId])
+
+  function persistRecords(next) {
+    setRecords(next)
+    localStorage.setItem(timerRecordKey(data.meeting?.id), JSON.stringify(next))
+  }
+
+  function selectItem(id) {
+    setActiveId(id)
+    setBaseElapsed(0)
+    setStartedAt(null)
+    setNow(Date.now())
+  }
+
+  function startTimer() {
+    if (!activeItem.id || startedAt) return
+    setStartedAt(Date.now())
+    setNow(Date.now())
+  }
+
+  function pauseTimer() {
+    if (!startedAt) return
+    setBaseElapsed(elapsed)
+    setStartedAt(null)
+  }
+
+  function resetTimer() {
+    setBaseElapsed(0)
+    setStartedAt(null)
+    setNow(Date.now())
+  }
+
+  function endTimer() {
+    if (!activeItem.id) return
+    const finalElapsed = elapsed
+    const finalLight = timerLight(finalElapsed, activeTargets)
+    const record = {
+      id: `${activeItem.id}-${Date.now()}`,
+      itemId: activeItem.id,
+      summary: activeItem.summary,
+      person: activeItem.person,
+      duration: activeItem.duration,
+      elapsed: Math.round(finalElapsed),
+      light: finalLight.key,
+      lightLabel: uiLang === 'zh' ? finalLight.text : finalLight.label,
+      endedAt: new Date().toISOString(),
+    }
+    persistRecords([record, ...records].slice(0, 80))
+    resetTimer()
+  }
+
+  function nextItem() {
+    const index = flowItems.findIndex(item => item.id === activeItem.id)
+    const next = flowItems[index + 1]
+    if (next) selectItem(next.id)
+  }
+
+  const categoryRows = [
+    { title: t.prepared, rows: flowItems.filter(item => canonicalAgendaRoleKey(item.roleName).startsWith('prepared-') || /备稿|Prepared/i.test(item.summary)) },
+    { title: t.impromptu, rows: flowItems.filter(item => canonicalAgendaRoleKey(item.roleName).startsWith('topics-') || /即席讲员|Table Topics Speaker/i.test(item.summary)) },
+    { title: t.evaluator, rows: flowItems.filter(item => canonicalAgendaRoleKey(item.roleName).startsWith('evaluator-') || /^Evaluator/i.test(item.summary) || /评论 \d|Evaluator \d/i.test(item.summary)) },
+  ]
+
+  return (
+    <div className="tm-main-column">
+      <div className="tm-screen-head">
+        <div>
+          <h1>{t.navTimer}</h1>
+          <p>{data.meeting.number || t.currentMeeting} {t.regularMeeting} | {data.meeting.date}</p>
+        </div>
+      </div>
+
+      <div className="tm-timer-layout">
+        <section className="tm-panel tm-timer-flow">
+          <div className="tm-panel-title">
+            <span className="tm-icon">⏱</span>
+            <h2>会议流程控制</h2>
+          </div>
+          <div className="tm-timer-flow-list">
+            {agendaRows.map(item => item.section ? (
+              <div key={item.id} className="tm-timer-section">{item.section}</div>
+            ) : (
+              <button key={item.id} className={activeItem.id === item.id ? 'active' : ''} onClick={() => selectItem(item.id)}>
+                <b>{item.time}</b>
+                <span>{item.summary}</span>
+                <small>{item.person || t.pending} · {item.duration} min</small>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="tm-panel tm-timer-stage">
+          <div className={`tm-timer-light ${light.key}`}>
+            <span>{uiLang === 'zh' ? light.text : light.label}</span>
+          </div>
+          <div className="tm-timer-active">
+            <span>{activeItem.time || '--:--'}</span>
+            <h2>{activeItem.summary || '请选择流程'}</h2>
+            <p>{activeItem.person || t.pending}</p>
+          </div>
+          <div className="tm-timer-clock">{formatTimer(elapsed)}</div>
+          <div className="tm-timer-progress"><i style={{ width: `${progress}%` }} /></div>
+          <div className="tm-timer-targets">
+            <div><b>青灯</b><span>{activeTargets.min} min</span></div>
+            <div><b>黄灯</b><span>{activeTargets.yellow} min</span></div>
+            <div><b>红灯</b><span>{activeTargets.red} min</span></div>
+          </div>
+          <div className="tm-timer-actions">
+            <button className="tm-gold" onClick={startTimer} disabled={!!startedAt}>{startedAt ? '进行中' : '开始'}</button>
+            <button onClick={pauseTimer} disabled={!startedAt}>暂停</button>
+            <button onClick={endTimer}>结束并记录</button>
+            <button onClick={resetTimer}>重置</button>
+            <button onClick={nextItem}>下一流程</button>
+          </div>
+        </section>
+      </div>
+
+      <section className="tm-panel">
+        <div className="tm-panel-title">
+          <span className="tm-icon">▦</span>
+          <h2>备稿 / 即席 / 评估计时</h2>
+        </div>
+        <div className="tm-timer-category-grid">
+          {categoryRows.map(group => (
+            <div key={group.title} className="tm-timer-category">
+              <h3>{group.title}</h3>
+              {group.rows.length ? group.rows.map(item => (
+                <button key={item.id} className={activeItem.id === item.id ? 'active' : ''} onClick={() => selectItem(item.id)}>
+                  <b>{item.person || t.pending}</b>
+                  <span>{item.summary}</span>
+                  <small>{item.duration} min</small>
+                </button>
+              )) : <p>{t.pending}</p>}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="tm-panel">
+        <div className="tm-panel-title">
+          <span className="tm-icon">✓</span>
+          <h2>计时记录</h2>
+        </div>
+        <div className="tm-timer-records">
+          {records.length ? records.map(record => (
+            <div key={record.id} className="tm-timer-record">
+              <b>{record.summary}</b>
+              <span>{record.person || t.pending}</span>
+              <small>{formatTimer(record.elapsed)} · {record.lightLabel}</small>
+            </div>
+          )) : <p>{t.pending}</p>}
+        </div>
+      </section>
     </div>
   )
 }
@@ -3359,6 +3599,7 @@ export default function ToastmastersVote() {
       label: t.navGroupMeeting,
       items: [
         ['meeting', t.navMeeting],
+        ['timer', t.navTimer],
         ['people', t.navPeople],
       ],
     },
@@ -3484,6 +3725,7 @@ export default function ToastmastersVote() {
         {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} meetingOps={meetingOps} spaceId={workspaceId} voteLink={effectiveVoteLink} />}
         {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={appText} />}
         {view === 'meeting' && <MeetingView data={data} setData={setData} persistState={persistState} people={people} setPeople={setPeople} persistPeople={persistPeople} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={appText} settings={settings} voteLink={effectiveVoteLink} />}
+        {view === 'timer' && <TimerView data={data} people={people} meetingOps={meetingOps} settings={settings} t={appText} />}
         {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={appText} spaceId={workspaceId} />}
         {view === 'success' && <div className="tm-success-card"><h1>{appText.thankVote}</h1><p>{appText.recorded}</p></div>}
         {view === 'share' && <SharePoster data={data} t={appText} voteLink={effectiveVoteLink} />}
