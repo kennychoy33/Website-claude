@@ -2362,12 +2362,12 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh') {
   const preparedRows = ['prepared-1', 'prepared-2', 'prepared-3']
     .map(key => byKey.get(key))
     .filter(Boolean)
-    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), agendaRoleSummary(role, people, data, lang), role.time || preparedDurations[index] || '5-7', canonicalAgendaRoleKey(role.roleName), role, preparedTimes[index] || '8:26PM'))
+    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), agendaRoleSummary(role, people, data, lang), preparedDurations[index] || '5-7', canonicalAgendaRoleKey(role.roleName), role, preparedTimes[index] || '8:26PM'))
   const evaluatorTimes = ['9:00PM', '9:04PM', '9:08PM']
   const evaluatorRows = ['evaluator-1', 'evaluator-2', 'evaluator-3']
     .map(key => byKey.get(key))
     .filter(Boolean)
-    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), agendaRoleSummary(role, people, data, lang), role.time || '2-3', canonicalAgendaRoleKey(role.roleName), role, evaluatorTimes[index] || '9:08PM'))
+    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), agendaRoleSummary(role, people, data, lang), '2-3', canonicalAgendaRoleKey(role.roleName), role, evaluatorTimes[index] || '9:08PM'))
   const timerRole = byKey.get('timer')
   const toastmasterRole = byKey.get('toastmaster')
   const presidentRole = byKey.get('president')
@@ -2384,7 +2384,7 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh') {
     { section: text('演说环节', 'Prepared Speeches') },
     ...preparedRows,
     rowFor('timer-report-1', text('计时报告', 'Timer Report'), '1', 'timer', timerRole, '8:34PM'),
-    rowFor('topics-master', text('即席主持', 'Table Topics Session'), byKey.get('topics-master')?.time || '15', 'topics-master', null, '8:35PM'),
+    rowFor('topics-master', text('即席主持', 'Table Topics Session'), '15', 'topics-master', null, '8:35PM'),
     rowFor('timer-report-2', text('计时报告', 'Timer Report'), '1', 'timer', timerRole, '8:50PM'),
     rowFor('photo', text('大合照', 'Group Photo'), '1', 'president', presidentRole, '8:51PM'),
     rowFor('break', text('交流时间', 'Networking Break'), '8', 'toastmaster', toastmasterRole, '8:52PM'),
@@ -2395,7 +2395,7 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh') {
     rowFor('vote', text('投票环节', 'Voting Session'), '1', 'toastmaster', toastmasterRole, '9:20PM'),
     rowFor('grammarian-report', text('语言评论', 'Grammarian Report'), '3-5', 'grammarian', null, '9:25PM'),
     rowFor('ah-counter-report', text('尾音计算报告', 'Ah Counter Report'), '2-3', 'ah-counter', null, '9:30PM'),
-    rowFor('general-evaluator', text('总评论', 'General Evaluation'), byKey.get('general-evaluator')?.time || '8-10', 'general-evaluator', generalEvaluatorRole, '9:40PM'),
+    rowFor('general-evaluator', text('总评论', 'General Evaluation'), '8-10', 'general-evaluator', generalEvaluatorRole, '9:40PM'),
     rowFor('awards', text('表扬最佳表现', 'Awards Presentation'), '5', 'toastmaster', toastmasterRole, '9:45PM'),
     rowFor('exco-report', text('执委及事项报告', 'EXCO / Announcements'), '3', 'toastmaster', toastmasterRole, '9:50PM'),
     rowFor('president-closing', text('会长致休会词', 'President closing address'), '3-5', 'president', presidentRole, '9:53PM'),
