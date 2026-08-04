@@ -1458,9 +1458,9 @@ function parseTimerMinutes(value = '', fallback = 3) {
 function timerTargets(item = {}) {
   const key = canonicalAgendaRoleKey(item.roleName || item.id || '')
   const summary = String(item.summary || '')
-  if (key.startsWith('prepared-') || /prepared|备稿|演说|演讲/i.test(summary)) return { min: 5, yellow: 6, red: 7 }
-  if (key.startsWith('topics-') || /table topics speaker|即席讲员/i.test(summary)) return { min: 1, yellow: 1.5, red: 2 }
-  if (key.startsWith('evaluator-') || /^evaluator/i.test(item.roleName || '') || /evaluation|评论|评估/i.test(summary)) return { min: 2, yellow: 2.5, red: 3 }
+  if (key.startsWith('prepared-') || /prepared|备稿/i.test(summary)) return parseTimerMinutes(item.duration || item.time, 7)
+  if (key.startsWith('topics-') || /table topics speaker|即席讲员/i.test(summary)) return parseTimerMinutes(item.duration || item.time, 2)
+  if (key.startsWith('evaluator-') || /^evaluator/i.test(item.roleName || '') || /evaluation|评论|评估/i.test(summary)) return parseTimerMinutes(item.duration || item.time, 3)
   return parseTimerMinutes(item.duration || item.time, 3)
 }
 
@@ -2287,7 +2287,7 @@ function minutesFromRoleTime(value = '') {
   return match ? Number(match[0]) : 3
 }
 
-const DEFAULT_AGENDA_START_MINUTES = 19 * 60 + 50
+const DEFAULT_AGENDA_START_MINUTES = 19 * 60 + 15
 
 function formatAgendaTime(totalMinutes) {
   const hours = Math.floor(totalMinutes / 60)
@@ -2346,66 +2346,63 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh') {
   const en = lang !== 'zh'
   const text = (zh, english) => lang === 'bi' ? `${zh} / ${english}` : (en ? english : zh)
   const byKey = new Map(rows.map(role => [canonicalAgendaRoleKey(role.roleName), role]))
-  const rowFor = (key, summary, duration, personKey = key, source = null) => {
+  const rowFor = (key, summary, duration, personKey = key, source = null, time = '') => {
     const role = source || byKey.get(personKey) || byKey.get(key) || {}
     return {
       id: `${key}-${summary}`,
       roleName: role.roleName || key,
+      time,
       summary,
       person: personLabel(people, role.personType, role.personId),
       duration,
     }
   }
-  const preparedRows = ['prepared-1', 'prepared-2', 'prepared-3', 'prepared-4']
+  const preparedTimes = ['8:10PM', '8:18PM', '8:26PM']
+  const preparedDurations = ['4-6', '5-7', '5-7']
+  const preparedRows = ['prepared-1', 'prepared-2', 'prepared-3']
     .map(key => byKey.get(key))
     .filter(Boolean)
-    .map(role => rowFor(canonicalAgendaRoleKey(role.roleName), agendaRoleSummary(role, people, data, lang), role.time || '7', canonicalAgendaRoleKey(role.roleName), role))
-  const topicRows = ['topics-1', 'topics-2', 'topics-3', 'topics-4']
+    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), agendaRoleSummary(role, people, data, lang), role.time || preparedDurations[index] || '5-7', canonicalAgendaRoleKey(role.roleName), role, preparedTimes[index] || '8:26PM'))
+  const evaluatorTimes = ['9:00PM', '9:04PM', '9:08PM']
+  const evaluatorRows = ['evaluator-1', 'evaluator-2', 'evaluator-3']
     .map(key => byKey.get(key))
     .filter(Boolean)
-    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), `${text('即席讲员', 'Table Topics Speaker')} ${index + 1}`, role.time || '2', canonicalAgendaRoleKey(role.roleName), role))
-  const evaluatorRows = ['evaluator-1', 'evaluator-2', 'evaluator-3', 'evaluator-4']
-    .map(key => byKey.get(key))
-    .filter(Boolean)
-    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), `${text('评论', 'Evaluator')} ${index + 1}`, role.time || '3', canonicalAgendaRoleKey(role.roleName), role))
+    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), agendaRoleSummary(role, people, data, lang), role.time || '2-3', canonicalAgendaRoleKey(role.roleName), role, evaluatorTimes[index] || '9:08PM'))
   const timerRole = byKey.get('timer')
   const toastmasterRole = byKey.get('toastmaster')
   const presidentRole = byKey.get('president')
+  const technicalRole = byKey.get('technical')
+  const generalEvaluatorRole = byKey.get('general-evaluator')
 
   const flow = [
-    rowFor('sergeant', text('礼宾司致欢迎词', 'Sergeant at Arms welcome'), '3'),
-    rowFor('president', text('会长致开会词', 'President opening address'), '5'),
-    rowFor('toastmaster', text('司仪介绍节目流程', 'Introduce the meeting program'), '8-10'),
-    rowFor('timer', text('计时员说明时间规则', 'Timer explains timing rules'), '3'),
-    rowFor('ah-counter', text('尾音计算员说明规则', 'Ah Counter explains rules'), '3'),
-    rowFor('grammarian', text('语言评论员介绍每日一词', 'Grammarian introduces Word of the Day'), '5'),
+    rowFor('technical', text('技术经理', 'Technical Manager'), '15', 'technical', technicalRole, '7:15PM'),
+    rowFor('registration', text('登记与交流', 'Registration and networking'), '10', 'toastmaster', toastmasterRole, '7:30PM'),
+    rowFor('sergeant', text('礼宾司致欢迎词', 'Sergeant at Arms welcome'), '5', 'sergeant', null, '7:35PM'),
+    rowFor('president', text('会长致开会词', 'President opening address'), '3-5', 'president', presidentRole, '7:40PM'),
+    rowFor('toastmaster', text('司仪介绍节目流程', 'Introduce the meeting program'), '8-10', 'toastmaster', toastmasterRole, '7:45PM'),
+    rowFor('grammarian', text('语言评论员介绍每日一词', 'Grammarian introduces Word of the Day'), '5', 'grammarian', null, '7:55PM'),
     { section: text('演说环节', 'Prepared Speeches') },
     ...preparedRows,
-    rowFor('timer-report-1', text('计时报告', 'Timer Report'), '1', 'timer', timerRole),
-    rowFor('topics-master', text('即席演讲环节【每位讲员1至2分钟】', 'Table Topics Session [1 to 2 minutes each]'), byKey.get('topics-master')?.time || '10', 'topics-master'),
-    ...topicRows,
-    rowFor('timer-report-2', text('计时报告', 'Timer Report'), '1', 'timer', timerRole),
-    rowFor('photo', text('大合照', 'Group Photo'), '1', 'president', presidentRole),
-    rowFor('break', text('交流时间', 'Networking Break'), '6', 'toastmaster', toastmasterRole),
+    rowFor('timer-report-1', text('计时报告', 'Timer Report'), '1', 'timer', timerRole, '8:34PM'),
+    rowFor('topics-master', text('即席主持', 'Table Topics Session'), byKey.get('topics-master')?.time || '15', 'topics-master', null, '8:35PM'),
+    rowFor('timer-report-2', text('计时报告', 'Timer Report'), '1', 'timer', timerRole, '8:50PM'),
+    rowFor('photo', text('大合照', 'Group Photo'), '1', 'president', presidentRole, '8:51PM'),
+    rowFor('break', text('交流时间', 'Networking Break'), '8', 'toastmaster', toastmasterRole, '8:52PM'),
     { section: text('评论（由总评论承接）', 'Evaluation Session') },
     ...evaluatorRows,
-    rowFor('topics-evaluation', text('即席评论', 'Table Topics Evaluation'), '3-5', 'general-evaluator'),
-    rowFor('timer-report-3', text('计时报告', 'Timer Report'), '1', 'timer', timerRole),
-    rowFor('vote', text('投票环节', 'Voting Session'), '1', 'toastmaster', toastmasterRole),
-    rowFor('grammarian-report', text('语言评论', 'Grammarian Report'), '3-5', 'grammarian'),
-    rowFor('ah-counter-report', text('尾音计算报告', 'Ah Counter Report'), '2-3', 'ah-counter'),
-    rowFor('general-evaluator', text('总评论', 'General Evaluation'), byKey.get('general-evaluator')?.time || '8-10', 'general-evaluator'),
-    rowFor('awards', text('表扬最佳表现', 'Awards Presentation'), '5', 'toastmaster', toastmasterRole),
-    rowFor('exco-report', text('执委及事项报告', 'EXCO / Announcements'), '3', 'toastmaster', toastmasterRole),
-    rowFor('president-closing', text('会长致休会词', 'President closing address'), '3-5', 'president', presidentRole),
+    rowFor('topics-evaluation', text('即席评论', 'Table Topics Evaluation'), '5-7', 'general-evaluator', generalEvaluatorRole, '9:12PM'),
+    rowFor('timer-report-3', text('计时报告', 'Timer Report'), '1', 'timer', timerRole, '9:19PM'),
+    rowFor('vote', text('投票环节', 'Voting Session'), '1', 'toastmaster', toastmasterRole, '9:20PM'),
+    rowFor('grammarian-report', text('语言评论', 'Grammarian Report'), '3-5', 'grammarian', null, '9:25PM'),
+    rowFor('ah-counter-report', text('尾音计算报告', 'Ah Counter Report'), '2-3', 'ah-counter', null, '9:30PM'),
+    rowFor('general-evaluator', text('总评论', 'General Evaluation'), byKey.get('general-evaluator')?.time || '8-10', 'general-evaluator', generalEvaluatorRole, '9:40PM'),
+    rowFor('awards', text('表扬最佳表现', 'Awards Presentation'), '5', 'toastmaster', toastmasterRole, '9:45PM'),
+    rowFor('exco-report', text('执委及事项报告', 'EXCO / Announcements'), '3', 'toastmaster', toastmasterRole, '9:50PM'),
+    rowFor('president-closing', text('会长致休会词', 'President closing address'), '3-5', 'president', presidentRole, '9:53PM'),
   ]
-  let current = DEFAULT_AGENDA_START_MINUTES
   return flow.map((item, index) => {
     if (item.section) return { id: `section-${index}`, section: item.section }
-    const duration = minutesFromRoleTime(item.duration)
-    const next = { ...item, time: formatAgendaTime(current) }
-    current += duration
-    return next
+    return item
   })
 }
 
