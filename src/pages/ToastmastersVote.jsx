@@ -222,6 +222,8 @@ const LANG = {
     rolesTitle: '职务分配',
     agendaTitle: '例会表',
     printAgenda: '列印例会表',
+    downloadPdf: '下载PDF',
+    generatingPdf: 'PDF生成中...',
     attended: '出席',
     absent: '缺席',
     role: '职务',
@@ -424,6 +426,8 @@ const LANG = {
     rolesTitle: 'Role Assignment',
     agendaTitle: 'Agenda',
     printAgenda: 'Print Agenda',
+    downloadPdf: 'Download PDF',
+    generatingPdf: 'Generating PDF...',
     attended: 'Attended',
     absent: 'Absent',
     role: 'Role',
@@ -3016,7 +3020,63 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
     printWindow.focus()
     setTimeout(() => {
       printWindow.print()
-    }, 450)
+    }, 900)
+  }
+
+  async function downloadAgendaPdf() {
+    const agenda = document.querySelector('.tm-agenda-print')
+    if (!agenda) return
+    setMeetingActionStatus(t.generatingPdf)
+    const wrapper = document.createElement('div')
+    wrapper.style.position = 'fixed'
+    wrapper.style.left = '-10000px'
+    wrapper.style.top = '0'
+    wrapper.style.width = '210mm'
+    wrapper.style.background = '#ffffff'
+    wrapper.style.zIndex = '-1'
+    const clone = agenda.cloneNode(true)
+    clone.style.display = 'block'
+    clone.style.width = '210mm'
+    clone.style.minHeight = '297mm'
+    clone.style.boxShadow = 'none'
+    clone.style.borderRadius = '0'
+    wrapper.appendChild(clone)
+    document.body.appendChild(wrapper)
+    try {
+      await document.fonts?.ready
+      await Promise.all(Array.from(clone.querySelectorAll('img')).map(img => (
+        img.complete ? Promise.resolve() : new Promise(resolve => {
+          img.onload = resolve
+          img.onerror = resolve
+        })
+      )))
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ])
+      const canvas = await html2canvas(clone, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      })
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageWidth = 210
+      const pageHeight = 297
+      const ratio = Math.min(pageWidth / canvas.width, pageHeight / canvas.height)
+      const imageWidth = canvas.width * ratio
+      const imageHeight = canvas.height * ratio
+      const x = (pageWidth - imageWidth) / 2
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.98), 'JPEG', x, 0, imageWidth, imageHeight)
+      const filename = `${data.meeting.number || 'meeting'}-${data.meeting.date || 'agenda'}.pdf`.replace(/[\\/:*?"<>|]+/g, '-')
+      pdf.save(filename)
+      setMeetingActionStatus(t.saved)
+    } catch (err) {
+      console.error(err)
+      setMeetingActionStatus(t.saveFailed)
+    } finally {
+      wrapper.remove()
+    }
   }
 
   function selectRecord(id) {
@@ -3047,6 +3107,7 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
           <button onClick={editCurrent}>{t.editMeeting}</button>
           <button onClick={() => setAgendaImportOpen(true)} disabled={locked}>{t.importAgenda}</button>
           <button onClick={exportExcel}>{t.exportExcel}</button>
+          <button className="tm-gold" onClick={downloadAgendaPdf}>{t.downloadPdf}</button>
           <button onClick={saveMeetingAll} disabled={locked}>{t.save}</button>
           <button onClick={addRole} disabled={locked}>{t.addRole}</button>
           <button onClick={resetRolesFromTemplate} disabled={locked}>{t.resetRoles}</button>
