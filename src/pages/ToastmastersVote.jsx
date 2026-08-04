@@ -706,16 +706,27 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
   }
 
   function saveSetup() {
-    const next = isVotingOpen ? data : syncedVoteData()
+    const next = {
+      ...data,
+      meeting: {
+        ...data.meeting,
+        link: voteLink || getPublicVoteUrl(spaceId),
+      },
+    }
     setData(next)
     persistState(next)
   }
 
   function setStatus(status) {
     if (status === 'open' && !cloudReady) return
-    const next = status === 'open'
-      ? syncedVoteData({ ...data, meeting: { ...data.meeting, status } })
-      : { ...data, meeting: { ...data.meeting, status } }
+    const next = {
+      ...data,
+      meeting: {
+        ...data.meeting,
+        status,
+        link: voteLink || getPublicVoteUrl(spaceId),
+      },
+    }
     setData(next)
     persistState(next)
   }
