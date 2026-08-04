@@ -1541,7 +1541,9 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
     setStartedAt(null)
     setNow(Date.now())
     setTimeout(() => {
-      timerStageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      if (!timerStageRef.current) return
+      const top = timerStageRef.current.getBoundingClientRect().top + window.scrollY - 12
+      window.scrollTo({ top, behavior: 'auto' })
     }, 60)
   }
 
