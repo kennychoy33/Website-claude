@@ -3129,6 +3129,7 @@ export default function ToastmastersVote() {
   const [lang, setLang] = useState(() => localStorage.getItem('tm-vote-lang') || 'zh')
   const [managedClubs, setManagedClubs] = useState(() => loadManagedClubs())
   const [selectedClubId, setSelectedClubId] = useState(() => publicView ? publicClub : getActiveClubId())
+  const [openNavGroups, setOpenNavGroups] = useState({})
   const [user, setUser] = useState(null)
   const [authReady, setAuthReady] = useState(!isCloudConfigured || publicView)
   const [source, setSource] = useState(isCloudConfigured ? 'cloud' : 'local')
@@ -3354,6 +3355,7 @@ export default function ToastmastersVote() {
 
   const navGroups = useMemo(() => [
     {
+      id: 'meeting',
       label: t.navGroupMeeting,
       items: [
         ['meeting', t.navMeeting],
@@ -3361,6 +3363,7 @@ export default function ToastmastersVote() {
       ],
     },
     {
+      id: 'vote',
       label: t.navGroupVote,
       items: [
         ['admin', t.navAdmin],
@@ -3371,6 +3374,7 @@ export default function ToastmastersVote() {
       ],
     },
     {
+      id: 'admin',
       label: t.navGroupAdmin,
       items: [
         ['system', t.navSystem],
@@ -3378,6 +3382,13 @@ export default function ToastmastersVote() {
       ].filter(([key]) => (key !== 'system' || canManageClubSettings) && (key !== 'master' || superAdmin)),
     },
   ].filter(group => group.items.length), [t, canManageClubSettings, superAdmin])
+
+  useEffect(() => {
+    const activeGroup = navGroups.find(group => group.items.some(([key]) => key === view))
+    if (activeGroup) {
+      setOpenNavGroups(current => ({ ...current, [activeGroup.id]: true }))
+    }
+  }, [navGroups, view])
 
   useEffect(() => {
     if (!publicView && authReady && user && !canManageClubSettings && ['system', 'master'].includes(view)) {
@@ -3448,10 +3459,21 @@ export default function ToastmastersVote() {
         <div className="tm-sidebar-menu">
           {navGroups.map(group => (
             <div key={group.label} className="tm-nav-group">
-              <span>{group.label}</span>
-              {group.items.map(([key, label]) => (
-                <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
-              ))}
+              <button
+                type="button"
+                className="tm-nav-group-toggle"
+                onClick={() => setOpenNavGroups(current => ({ ...current, [group.id]: !(current[group.id] ?? group.items.some(([key]) => key === view)) }))}
+              >
+                <span>{group.label}</span>
+                <b>{(openNavGroups[group.id] ?? group.items.some(([key]) => key === view)) ? '-' : '+'}</b>
+              </button>
+              {(openNavGroups[group.id] ?? group.items.some(([key]) => key === view)) && (
+                <div className="tm-nav-submenu">
+                  {group.items.map(([key, label]) => (
+                    <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -96,22 +96,47 @@
 .tm-nav-group {
   display: grid;
   gap: 6px;
-  padding: 10px;
+  padding: 8px;
   border: 1px solid rgba(255,255,255,.12);
   border-radius: 8px;
   background: rgba(255,255,255,.05);
 }
 
-.tm-nav-group span {
+.tm-nav-group-toggle {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 0 !important;
+  padding: 10px 10px !important;
+  background: transparent !important;
+}
+
+.tm-nav-group-toggle:hover {
+  background: rgba(255,255,255,.08) !important;
+}
+
+.tm-nav-group-toggle span {
   color: rgba(255,255,255,.56);
   font-size: 11px;
   font-weight: 900;
   letter-spacing: .08em;
   text-transform: uppercase;
-  padding: 0 6px 4px;
+  padding: 0;
 }
 
-.tm-nav-group button {
+.tm-nav-group-toggle b {
+  color: rgba(255,255,255,.82);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.tm-nav-submenu {
+  display: grid;
+  gap: 6px;
+}
+
+.tm-nav-submenu button {
   margin-bottom: 0;
   padding: 11px 12px;
   font-size: 14px;
@@ -1665,8 +1690,13 @@
     padding: 8px;
   }
 
-  .tm-nav-group span {
-    padding: 0 6px;
+  .tm-nav-group-toggle {
+    width: auto !important;
+  }
+
+  .tm-nav-submenu {
+    display: flex;
+    gap: 6px;
   }
 
   .tm-admin-grid,
