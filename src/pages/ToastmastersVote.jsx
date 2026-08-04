@@ -2287,6 +2287,8 @@ function minutesFromRoleTime(value = '') {
   return match ? Number(match[0]) : 3
 }
 
+const DEFAULT_AGENDA_START_MINUTES = 19 * 60 + 50
+
 function formatAgendaTime(totalMinutes) {
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
@@ -2324,7 +2326,7 @@ function agendaRoleSummary(role, people, data, lang = 'zh') {
 }
 
 function agendaScheduleRows(rows, people, data, lang = 'zh') {
-  let current = 19 * 60 + 15
+  let current = DEFAULT_AGENDA_START_MINUTES
   return rows.map((role, index) => {
     const duration = minutesFromRoleTime(role.time)
     const item = {
@@ -2397,7 +2399,7 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh') {
     rowFor('exco-report', text('执委及事项报告', 'EXCO / Announcements'), '3', 'toastmaster', toastmasterRole),
     rowFor('president-closing', text('会长致休会词', 'President closing address'), '3-5', 'president', presidentRole),
   ]
-  let current = 19 * 60 + 15
+  let current = DEFAULT_AGENDA_START_MINUTES
   return flow.map((item, index) => {
     if (item.section) return { id: `section-${index}`, section: item.section }
     const duration = minutesFromRoleTime(item.duration)
