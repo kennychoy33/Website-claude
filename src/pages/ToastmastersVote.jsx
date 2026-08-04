@@ -1540,11 +1540,9 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
     setBaseElapsed(0)
     setStartedAt(null)
     setNow(Date.now())
-    requestAnimationFrame(() => {
-      if (window.matchMedia('(max-width: 980px)').matches) {
-        timerStageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
-    })
+    setTimeout(() => {
+      timerStageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 60)
   }
 
   function startTimer() {
