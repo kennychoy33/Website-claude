@@ -1464,6 +1464,11 @@ function formatTimer(seconds) {
   return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
 }
 
+function formatTargetMinutes(value) {
+  const rounded = Math.round((Number(value) || 0) * 10) / 10
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
+}
+
 function timerLight(elapsedSeconds, targets) {
   const elapsedMinutes = (elapsedSeconds || 0) / 60
   if (elapsedMinutes >= targets.red) return { key: 'red', label: 'Red', text: '红灯' }
@@ -1618,9 +1623,9 @@ function TimerView({ data, people, meetingOps, settings, t }) {
           <div className="tm-timer-clock">{formatTimer(elapsed)}</div>
           <div className="tm-timer-progress"><i style={{ width: `${progress}%` }} /></div>
           <div className="tm-timer-targets">
-            <div><b>青灯</b><span>{activeTargets.min} min</span></div>
-            <div><b>黄灯</b><span>{activeTargets.yellow} min</span></div>
-            <div><b>红灯</b><span>{activeTargets.red} min</span></div>
+            <div><b>青灯</b><span>{formatTargetMinutes(activeTargets.min)} min</span></div>
+            <div><b>黄灯</b><span>{formatTargetMinutes(activeTargets.yellow)} min</span></div>
+            <div><b>红灯</b><span>{formatTargetMinutes(activeTargets.red)} min</span></div>
           </div>
           <div className="tm-timer-actions">
             <button className="tm-gold" onClick={startTimer} disabled={!!startedAt}>{startedAt ? '进行中' : '开始'}</button>
