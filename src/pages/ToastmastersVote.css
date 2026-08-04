@@ -450,6 +450,7 @@
   justify-items: center;
   text-align: center;
   min-height: 520px;
+  scroll-margin-top: 14px;
 }
 
 .tm-timer-light {

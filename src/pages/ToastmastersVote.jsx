@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import {
   getOrCreateVoterToken,
@@ -1486,6 +1486,7 @@ function timerLight(elapsedSeconds, targets) {
 
 function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId = 'default', publicTimer = false, timerLink = '' }) {
   const uiLang = t.langLabel === 'Language' ? 'en' : 'zh'
+  const timerStageRef = useRef(null)
   const agendaRows = standardAgendaScheduleRows(agendaRowsFromTemplate(settings, meetingOps.roles), people, data, uiLang)
   const flowItems = agendaRows.filter(item => !item.section)
   const firstId = flowItems[0]?.id || ''
@@ -1539,6 +1540,11 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
     setBaseElapsed(0)
     setStartedAt(null)
     setNow(Date.now())
+    requestAnimationFrame(() => {
+      if (window.matchMedia('(max-width: 980px)').matches) {
+        timerStageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    })
   }
 
   function startTimer() {
@@ -1637,7 +1643,7 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
           </div>
         </section>
 
-        <section className="tm-panel tm-timer-stage">
+        <section ref={timerStageRef} className="tm-panel tm-timer-stage">
           <div className={`tm-timer-light ${light.key}`}>
             <span>{uiLang === 'zh' ? light.text : light.label}</span>
           </div>
