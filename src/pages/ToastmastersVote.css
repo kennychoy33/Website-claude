@@ -385,6 +385,10 @@
   align-items: start;
 }
 
+.tm-mobile-only {
+  display: none !important;
+}
+
 .tm-timer-flow {
   max-height: calc(100vh - 112px);
   overflow-y: auto;
@@ -1973,6 +1977,22 @@
 
   .tm-timer-stage {
     min-height: auto;
+  }
+
+  .tm-mobile-only {
+    display: inline-flex !important;
+  }
+
+  .tm-timer-layout:not(.timer-focus) .tm-timer-stage {
+    display: none;
+  }
+
+  .tm-timer-layout.timer-focus .tm-timer-flow {
+    display: none;
+  }
+
+  .tm-timer-layout.timer-focus .tm-timer-stage {
+    display: grid;
   }
 
   .tm-timer-flow {

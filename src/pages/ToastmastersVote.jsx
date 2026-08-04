@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
 import {
   getOrCreateVoterToken,
@@ -1486,7 +1486,6 @@ function timerLight(elapsedSeconds, targets) {
 
 function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId = 'default', publicTimer = false, timerLink = '' }) {
   const uiLang = t.langLabel === 'Language' ? 'en' : 'zh'
-  const timerStageRef = useRef(null)
   const agendaRows = standardAgendaScheduleRows(agendaRowsFromTemplate(settings, meetingOps.roles), people, data, uiLang)
   const flowItems = agendaRows.filter(item => !item.section)
   const firstId = flowItems[0]?.id || ''
@@ -1496,6 +1495,7 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
   const [now, setNow] = useState(Date.now())
   const [records, setRecords] = useState([])
   const [timerStatus, setTimerStatus] = useState('')
+  const [timerFocus, setTimerFocus] = useState(false)
   const activeItem = flowItems.find(item => item.id === activeId) || flowItems[0] || {}
   const activeTargets = timerTargets(activeItem)
   const elapsed = startedAt ? baseElapsed + ((now - startedAt) / 1000) : baseElapsed
@@ -1540,11 +1540,7 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
     setBaseElapsed(0)
     setStartedAt(null)
     setNow(Date.now())
-    setTimeout(() => {
-      if (!timerStageRef.current) return
-      const top = timerStageRef.current.getBoundingClientRect().top + window.scrollY - 12
-      window.scrollTo({ top, behavior: 'auto' })
-    }, 60)
+    setTimerFocus(true)
   }
 
   function startTimer() {
@@ -1624,7 +1620,7 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
         )}
       </div>
 
-      <div className="tm-timer-layout">
+      <div className={`tm-timer-layout ${timerFocus ? 'timer-focus' : ''}`}>
         <section className="tm-panel tm-timer-flow">
           <div className="tm-panel-title">
             <span className="tm-icon">⏱</span>
@@ -1643,7 +1639,7 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
           </div>
         </section>
 
-        <section ref={timerStageRef} className="tm-panel tm-timer-stage">
+        <section className="tm-panel tm-timer-stage">
           <div className={`tm-timer-light ${light.key}`}>
             <span>{uiLang === 'zh' ? light.text : light.label}</span>
           </div>
@@ -1660,6 +1656,7 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
             <div><b>红灯</b><span>{formatTargetMinutes(activeTargets.red)} min</span></div>
           </div>
           <div className="tm-timer-actions">
+            <button className="tm-mobile-only" onClick={() => setTimerFocus(false)}>选择流程</button>
             <button className="tm-gold" onClick={startTimer} disabled={!!startedAt}>{startedAt ? '进行中' : '开始'}</button>
             <button onClick={pauseTimer} disabled={!startedAt}>暂停</button>
             <button onClick={endTimer}>结束并记录</button>
