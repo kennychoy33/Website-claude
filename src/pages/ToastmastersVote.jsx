@@ -89,6 +89,8 @@ const LANG = {
     regularMeeting: '例常活动',
     save: '保存设置',
     openVote: '开放投票',
+    closeVote: '关闭投票',
+    voteLockedNotice: '投票已开放。请先关闭投票，才可以修改会议资料或候选名单。',
     preview: '预览投票页',
     meetingInfo: '会议资料',
     meetingNo: '会议编号',
@@ -283,6 +285,8 @@ const LANG = {
     regularMeeting: 'Regular Meeting',
     save: 'Save Settings',
     openVote: 'Open Voting',
+    closeVote: 'Close Voting',
+    voteLockedNotice: 'Voting is open. Close voting before editing meeting details or candidates.',
     preview: 'Preview Voting Page',
     meetingInfo: 'Meeting Info',
     meetingNo: 'Meeting No.',
@@ -515,7 +519,7 @@ function SyncBadge({ source, syncStatus, t }) {
   )
 }
 
-function CandidateNamePicker({ item, members, onSelectMember, onTypeOther, t }) {
+function CandidateNamePicker({ item, members, onSelectMember, onTypeOther, t, disabled = false }) {
   const isKnownMember = members.some(member => member.name === item.name)
   const value = item.name && isKnownMember ? item.name : item.name ? '__other__' : ''
 
@@ -531,7 +535,7 @@ function CandidateNamePicker({ item, members, onSelectMember, onTypeOther, t }) 
 
   return (
     <div className="tm-name-picker">
-      <select value={value} onChange={handleChange}>
+      <select value={value} onChange={handleChange} disabled={disabled}>
         <option value="">{t.name}</option>
         {members.map(member => (
           <option key={member.id} value={member.name}>{member.name}</option>
@@ -539,7 +543,7 @@ function CandidateNamePicker({ item, members, onSelectMember, onTypeOther, t }) 
         <option value="__other__">其他 / Other</option>
       </select>
       {value === '__other__' && (
-        <input value={item.name} onChange={event => onTypeOther(event.target.value)} placeholder="其他 / Other" />
+        <input value={item.name} disabled={disabled} onChange={event => onTypeOther(event.target.value)} placeholder="其他 / Other" />
       )}
     </div>
   )
@@ -553,17 +557,19 @@ function roleMatchesCandidateType(roleName, type) {
   return false
 }
 
-function CandidateEditor({ type, candidates, onChange, t, people, meetingRoles = [] }) {
+function CandidateEditor({ type, candidates, onChange, t, people, meetingRoles = [], locked = false }) {
   const isPrepared = type === 'prepared'
   const title = isPrepared ? t.prepared : type === 'evaluator' ? t.evaluator : t.impromptu
   const activeMembers = (people?.members || []).filter(member => member.status !== 'inactive' && member.name)
   const candidateRoles = meetingRoles.filter(role => roleMatchesCandidateType(role.roleName, type))
 
   function update(id, field, value) {
+    if (locked) return
     onChange(candidates.map(item => item.id === id ? { ...item, [field]: value } : item))
   }
 
   function selectMember(id, member) {
+    if (locked) return
     onChange(candidates.map(item => {
       if (item.id !== id) return item
       const project = [member.pathway, member.level].filter(Boolean).join(' ')
@@ -574,6 +580,7 @@ function CandidateEditor({ type, candidates, onChange, t, people, meetingRoles =
   }
 
   function addCandidate() {
+    if (locked) return
     const nextId = `${type[0]}${Date.now()}`
     onChange([
       ...candidates,
@@ -584,6 +591,7 @@ function CandidateEditor({ type, candidates, onChange, t, people, meetingRoles =
   }
 
   function addFromRole(roleId) {
+    if (locked) return
     const role = candidateRoles.find(item => item.id === roleId)
     if (!role) return
     const name = personLabel(people, role.personType, role.personId)
@@ -599,6 +607,7 @@ function CandidateEditor({ type, candidates, onChange, t, people, meetingRoles =
   }
 
   function remove(id) {
+    if (locked) return
     onChange(candidates.filter(item => item.id !== id))
   }
 
@@ -609,7 +618,7 @@ function CandidateEditor({ type, candidates, onChange, t, people, meetingRoles =
         <h2>{title}</h2>
       </div>
       <div className="tm-role-import">
-        <select value="" onChange={event => addFromRole(event.target.value)}>
+        <select value="" disabled={locked} onChange={event => addFromRole(event.target.value)}>
           <option value="">{t.importRole}</option>
           {candidateRoles.map(role => {
             const name = personLabel(people, role.personType, role.personId)
@@ -638,10 +647,11 @@ function CandidateEditor({ type, candidates, onChange, t, people, meetingRoles =
                 onSelectMember={member => selectMember(item.id, member)}
                 onTypeOther={value => update(item.id, 'name', value)}
                 t={t}
+                disabled={locked}
               />
-              <input value={item.title} onChange={e => update(item.id, 'title', e.target.value)} />
-              <input value={item.project} onChange={e => update(item.id, 'project', e.target.value)} />
-              <button className="tm-danger" onClick={() => remove(item.id)}>{t.remove}</button>
+              <input value={item.title} disabled={locked} onChange={e => update(item.id, 'title', e.target.value)} />
+              <input value={item.project} disabled={locked} onChange={e => update(item.id, 'project', e.target.value)} />
+              <button className="tm-danger" disabled={locked} onClick={() => remove(item.id)}>{t.remove}</button>
             </div>
           ))}
         </div>
@@ -655,14 +665,15 @@ function CandidateEditor({ type, candidates, onChange, t, people, meetingRoles =
                 onSelectMember={member => selectMember(item.id, member)}
                 onTypeOther={value => update(item.id, 'name', value)}
                 t={t}
+                disabled={locked}
               />
-              <button onClick={() => remove(item.id)} aria-label={`Remove ${item.name}`}>x</button>
+              <button disabled={locked} onClick={() => remove(item.id)} aria-label={`Remove ${item.name}`}>x</button>
             </label>
           ))}
         </div>
       )}
 
-      <button className="tm-outline" onClick={addCandidate}>
+      <button className="tm-outline" disabled={locked} onClick={addCandidate}>
         {isPrepared ? t.addPrepared : type === 'evaluator' ? t.addEvaluator : t.addImpromptu}
       </button>
     </section>
@@ -671,12 +682,15 @@ function CandidateEditor({ type, candidates, onChange, t, people, meetingRoles =
 
 function AdminView({ data, setData, setView, persistState, source, syncStatus, t, people, meetingOps, spaceId, voteLink }) {
   const cloudReady = isCloudConfigured && source === 'cloud' && spaceId && !spaceId.startsWith('local-')
+  const isVotingOpen = ['open', '开放投票', '开放中'].includes(data.meeting.status)
 
   function updateMeeting(field, value) {
+    if (isVotingOpen) return
     setData({ ...data, meeting: { ...data.meeting, [field]: value } })
   }
 
   function updateCandidates(field, list) {
+    if (isVotingOpen) return
     setData({ ...data, [field]: list })
   }
 
@@ -692,19 +706,22 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
   }
 
   function saveSetup() {
-    const next = syncedVoteData()
+    const next = isVotingOpen ? data : syncedVoteData()
     setData(next)
     persistState(next)
   }
 
   function setStatus(status) {
     if (status === 'open' && !cloudReady) return
-    const next = syncedVoteData({ ...data, meeting: { ...data.meeting, status } })
+    const next = status === 'open'
+      ? syncedVoteData({ ...data, meeting: { ...data.meeting, status } })
+      : { ...data, meeting: { ...data.meeting, status } }
     setData(next)
     persistState(next)
   }
 
   function importFromMembers() {
+    if (isVotingOpen) return
     const activeMembers = (people?.members || []).filter(member => member.status !== 'inactive')
     const toBasicCandidate = (member, prefix, index) => ({
       id: `${prefix}${Date.now()}${index}`,
@@ -728,6 +745,7 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
   }
 
   function syncFromMeetingRoles() {
+    if (isVotingOpen) return
     setData(syncedVoteData())
   }
 
@@ -747,12 +765,18 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
           </div>
           <div className="tm-actions">
             <button onClick={saveSetup}>{t.save}</button>
-            <button onClick={importFromMembers}>{t.importMembers}</button>
-            <button onClick={syncFromMeetingRoles}>{t.syncFromRoles}</button>
-            <button className="tm-gold" disabled={!cloudReady} onClick={() => setStatus('open')}>{t.openVote}</button>
+            <button disabled={isVotingOpen} onClick={importFromMembers}>{t.importMembers}</button>
+            <button disabled={isVotingOpen} onClick={syncFromMeetingRoles}>{t.syncFromRoles}</button>
+            {isVotingOpen ? (
+              <button className="tm-gold" disabled={!cloudReady} onClick={() => setStatus('draft')}>{t.closeVote}</button>
+            ) : (
+              <button className="tm-gold" disabled={!cloudReady} onClick={() => setStatus('open')}>{t.openVote}</button>
+            )}
             <button disabled={!cloudReady} onClick={() => setView('vote')}>{t.preview}</button>
           </div>
         </div>
+
+        {isVotingOpen && <div className="tm-sync-badge"><b>{t.voteLockedNotice}</b></div>}
 
         {!cloudReady && (
           <section className="tm-panel tm-note-panel">
@@ -777,15 +801,15 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
             ].map(([field, label]) => (
               <label key={field}>
                 <span>{label}</span>
-                <input value={data.meeting[field]} onChange={e => updateMeeting(field, e.target.value)} />
+                <input value={data.meeting[field]} disabled={isVotingOpen} onChange={e => updateMeeting(field, e.target.value)} />
               </label>
             ))}
           </div>
         </section>
 
-        <CandidateEditor type="prepared" candidates={data.prepared} onChange={list => updateCandidates('prepared', list)} t={t} people={people} meetingRoles={meetingOps.roles} />
-        <CandidateEditor type="impromptu" candidates={data.impromptu} onChange={list => updateCandidates('impromptu', list)} t={t} people={people} meetingRoles={meetingOps.roles} />
-        <CandidateEditor type="evaluator" candidates={data.evaluator} onChange={list => updateCandidates('evaluator', list)} t={t} people={people} meetingRoles={meetingOps.roles} />
+        <CandidateEditor type="prepared" candidates={data.prepared} onChange={list => updateCandidates('prepared', list)} t={t} people={people} meetingRoles={meetingOps.roles} locked={isVotingOpen} />
+        <CandidateEditor type="impromptu" candidates={data.impromptu} onChange={list => updateCandidates('impromptu', list)} t={t} people={people} meetingRoles={meetingOps.roles} locked={isVotingOpen} />
+        <CandidateEditor type="evaluator" candidates={data.evaluator} onChange={list => updateCandidates('evaluator', list)} t={t} people={people} meetingRoles={meetingOps.roles} locked={isVotingOpen} />
       </div>
 
       <aside className="tm-share-panel">
@@ -2360,11 +2384,12 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
   const selectedRecord = records.find(record => record.id === selectedRecordId)
   const viewingOldRecord = selectedRecordId !== 'current'
   const locked = viewingOldRecord || isRecordLocked(selectedRecord)
-  const attendanceIndex = new Map(meetingOps.attendance.map(item => [`${item.personType}:${item.personId}`, item.attended]))
-  const attendanceRows = [
-    ...people.members.map(item => ({ personType: 'member', personId: item.id, name: item.name })),
-    ...people.guests.map(item => ({ personType: 'guest', personId: item.id, name: item.name })),
-  ].filter(item => item.name)
+  const memberAttendance = meetingOps.attendance.filter(item => item.personType === 'member')
+  const attendanceIndex = new Map(memberAttendance.map(item => [`${item.personType}:${item.personId}`, item.attended]))
+  const attendanceRows = people.members
+    .filter(item => item.status !== 'inactive')
+    .map(item => ({ personType: 'member', personId: item.id, name: item.name }))
+    .filter(item => item.name)
 
   useEffect(() => {
     let ignore = false
@@ -2568,13 +2593,18 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
     try {
       const savedData = await persistState(syncedData) || syncedData
       const activeMeetingId = savedData.meeting?.id || syncedData.meeting.id
+      const sanitizedMeetingOps = {
+        ...meetingOps,
+        attendance: meetingOps.attendance.filter(item => item.personType === 'member'),
+      }
       setData(savedData)
-      await persistMeetingOps(meetingOps, activeMeetingId)
+      setMeetingOps(sanitizedMeetingOps)
+      await persistMeetingOps(sanitizedMeetingOps, activeMeetingId)
       const record = {
         id: activeMeetingId || `${Date.now()}`,
         savedAt: new Date().toISOString(),
         data: savedData,
-        meetingOps,
+        meetingOps: sanitizedMeetingOps,
       }
       const nextRecords = [
         record,
