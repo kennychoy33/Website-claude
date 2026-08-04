@@ -83,6 +83,9 @@ const LANG = {
     navShare: '分享海报',
     navResults: '结果统计',
     navHistory: '历史记录',
+    navGroupMeeting: '会议运作',
+    navGroupVote: '投票报告',
+    navGroupAdmin: '系统设定',
     clubShort: '中华讲演会',
     club: '柔南区麻坡中华校友会讲演会',
     todaySetup: '今日投票设置',
@@ -279,6 +282,9 @@ const LANG = {
     navShare: 'Share Poster',
     navResults: 'Results',
     navHistory: 'History',
+    navGroupMeeting: 'Meeting',
+    navGroupVote: 'Voting & Reports',
+    navGroupAdmin: 'Settings',
     clubShort: 'Chung Hwa Toastmasters',
     club: 'Johor South Muar Chung Hwa Alumni Toastmasters Club',
     todaySetup: 'Today Voting Setup',
@@ -1427,18 +1433,25 @@ function Bar({ item, max }) {
 }
 
 function HistoryView({ data, t }) {
+  const historyWinner = value => value === 'Tied' ? t.tied : value || t.pending
+  const currentRecord = {
+    id: data.meeting.id,
+    meeting: data.meeting.number,
+    date: data.meeting.date,
+    preparedWinner: winner(data.prepared, t).label,
+    preparedVotes: winner(data.prepared, t).votes,
+    impromptuWinner: winner(data.impromptu, t).label,
+    impromptuVotes: winner(data.impromptu, t).votes,
+    evaluatorWinner: winner(data.evaluator, t).label,
+    evaluatorVotes: winner(data.evaluator, t).votes,
+  }
+  const currentKey = `${currentRecord.id || ''}|${currentRecord.meeting}|${currentRecord.date}`
   const records = [
-    ...data.history,
-    {
-      meeting: data.meeting.number,
-      date: data.meeting.date,
-      preparedWinner: winner(data.prepared, t).label,
-      preparedVotes: winner(data.prepared, t).votes,
-      impromptuWinner: winner(data.impromptu, t).label,
-      impromptuVotes: winner(data.impromptu, t).votes,
-      evaluatorWinner: winner(data.evaluator, t).label,
-      evaluatorVotes: winner(data.evaluator, t).votes,
-    },
+    currentRecord,
+    ...data.history.filter(record => {
+      const recordKey = `${record.id || ''}|${record.meeting}|${record.date}`
+      return recordKey !== currentKey
+    }),
   ]
 
   return (
@@ -1446,12 +1459,12 @@ function HistoryView({ data, t }) {
       <h2>{t.historyDb}</h2>
       <div className="tm-history-list">
         {records.map(record => (
-          <div key={`${record.meeting}-${record.date}`} className="tm-history-card">
+          <div key={`${record.id || record.meeting}-${record.date}`} className="tm-history-card">
             <strong>{record.meeting}</strong>
             <span>{record.date}</span>
-            <p>{t.bestPrepared}: {record.preparedWinner || t.pending} ({record.preparedVotes} {t.votes})</p>
-            <p>{t.bestImpromptu}: {record.impromptuWinner || t.pending} ({record.impromptuVotes} {t.votes})</p>
-            <p>{t.bestEvaluator}: {record.evaluatorWinner || t.pending} ({record.evaluatorVotes} {t.votes})</p>
+            <p>{t.bestPrepared}: {historyWinner(record.preparedWinner)} ({record.preparedVotes} {t.votes})</p>
+            <p>{t.bestImpromptu}: {historyWinner(record.impromptuWinner)} ({record.impromptuVotes} {t.votes})</p>
+            <p>{t.bestEvaluator}: {historyWinner(record.evaluatorWinner)} ({record.evaluatorVotes} {t.votes})</p>
           </div>
         ))}
       </div>
@@ -3334,24 +3347,37 @@ export default function ToastmastersVote() {
     setData(null)
   }
 
-  const nav = useMemo(() => [
-    ['meeting', t.navMeeting],
-    ['people', t.navPeople],
-    ['admin', t.navAdmin],
-    ['vote', t.navVote],
-    ['share', t.navShare],
-    ['results', t.navResults],
-    ['history', t.navHistory],
-  ], [t])
-
-  const bottomNav = useMemo(() => [
-    ['system', t.navSystem],
-    ['master', t.navMaster],
-  ], [t])
   const superAdmin = isSuperAdmin(user)
   const clubAdmin = isClubAdmin(user, settings)
   const canManageClubSettings = superAdmin || clubAdmin
   const roleLabel = superAdmin ? appText.roleSuperAdmin : clubAdmin ? appText.roleClubAdmin : appText.roleUser
+
+  const navGroups = useMemo(() => [
+    {
+      label: t.navGroupMeeting,
+      items: [
+        ['meeting', t.navMeeting],
+        ['people', t.navPeople],
+      ],
+    },
+    {
+      label: t.navGroupVote,
+      items: [
+        ['admin', t.navAdmin],
+        ['vote', t.navVote],
+        ['share', t.navShare],
+        ['results', t.navResults],
+        ['history', t.navHistory],
+      ],
+    },
+    {
+      label: t.navGroupAdmin,
+      items: [
+        ['system', t.navSystem],
+        ['master', t.navMaster],
+      ].filter(([key]) => (key !== 'system' || canManageClubSettings) && (key !== 'master' || superAdmin)),
+    },
+  ].filter(group => group.items.length), [t, canManageClubSettings, superAdmin])
 
   useEffect(() => {
     if (!publicView && authReady && user && !canManageClubSettings && ['system', 'master'].includes(view)) {
@@ -3419,14 +3445,14 @@ export default function ToastmastersVote() {
         <ClubSwitcher clubs={managedClubs} selectedClubId={selectedClubId} onChange={switchClub} t={appText} disabled={!superAdmin} />
         <CurrentUserCard user={user} roleLabel={roleLabel} t={appText} />
         {isCloudConfigured && <button onClick={handleLogout}>{appText.logout}</button>}
-        {nav.map(([key, label]) => (
-          <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
-        ))}
-        <div className="tm-sidebar-bottom">
-          {bottomNav
-            .filter(([key]) => (key !== 'system' || canManageClubSettings) && (key !== 'master' || superAdmin))
-            .map(([key, label]) => (
-            <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
+        <div className="tm-sidebar-menu">
+          {navGroups.map(group => (
+            <div key={group.label} className="tm-nav-group">
+              <span>{group.label}</span>
+              {group.items.map(([key, label]) => (
+                <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>
+              ))}
+            </div>
           ))}
         </div>
       </aside>}

@@ -74,6 +74,7 @@ alter table public.tm_votes
 alter table public.tm_winner_history
   add column if not exists owner_id uuid references auth.users(id) on delete cascade,
   add column if not exists club_id text not null default 'default',
+  add column if not exists meeting_id text,
   add column if not exists meeting_number text,
   add column if not exists meeting_date text,
   add column if not exists prepared_winner text,
@@ -176,6 +177,7 @@ create index if not exists tm_club_admins_owner_idx on public.tm_club_admins(own
 create index if not exists tm_members_owner_club_idx on public.tm_members(owner_id, club_id);
 create index if not exists tm_guests_owner_club_idx on public.tm_guests(owner_id, club_id);
 create index if not exists tm_meetings_owner_club_idx on public.tm_meetings(owner_id, club_id);
+create unique index if not exists tm_winner_history_meeting_unique on public.tm_winner_history(meeting_id);
 
 create or replace function public.tm_submit_vote(
   p_meeting_id text,
@@ -189,6 +191,17 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_owner_id uuid;
+  v_club_id text;
+  v_meeting_number text;
+  v_meeting_date text;
+  v_prepared_winner text;
+  v_prepared_votes integer := 0;
+  v_impromptu_winner text;
+  v_impromptu_votes integer := 0;
+  v_evaluator_winner text;
+  v_evaluator_votes integer := 0;
 begin
   if exists (
     select 1
@@ -218,6 +231,73 @@ begin
   set votes = votes + 1
   where id in (p_prepared_candidate_id, p_impromptu_candidate_id, p_evaluator_candidate_id)
     and meeting_id = p_meeting_id;
+
+  select owner_id, club_id, meeting_number, meeting_date
+  into v_owner_id, v_club_id, v_meeting_number, v_meeting_date
+  from public.tm_meetings
+  where id = p_meeting_id;
+
+  select name, votes
+  into v_prepared_winner, v_prepared_votes
+  from public.tm_candidates
+  where meeting_id = p_meeting_id
+    and category = 'prepared'
+  order by votes desc, sort_order asc
+  limit 1;
+
+  select name, votes
+  into v_impromptu_winner, v_impromptu_votes
+  from public.tm_candidates
+  where meeting_id = p_meeting_id
+    and category = 'impromptu'
+  order by votes desc, sort_order asc
+  limit 1;
+
+  select name, votes
+  into v_evaluator_winner, v_evaluator_votes
+  from public.tm_candidates
+  where meeting_id = p_meeting_id
+    and category = 'evaluator'
+  order by votes desc, sort_order asc
+  limit 1;
+
+  insert into public.tm_winner_history (
+    owner_id,
+    club_id,
+    meeting_id,
+    meeting_number,
+    meeting_date,
+    prepared_winner,
+    prepared_votes,
+    impromptu_winner,
+    impromptu_votes,
+    evaluator_winner,
+    evaluator_votes
+  )
+  values (
+    v_owner_id,
+    coalesce(v_club_id, 'default'),
+    p_meeting_id,
+    coalesce(v_meeting_number, ''),
+    coalesce(v_meeting_date, ''),
+    coalesce(v_prepared_winner, ''),
+    coalesce(v_prepared_votes, 0),
+    coalesce(v_impromptu_winner, ''),
+    coalesce(v_impromptu_votes, 0),
+    coalesce(v_evaluator_winner, ''),
+    coalesce(v_evaluator_votes, 0)
+  )
+  on conflict (meeting_id) do update set
+    owner_id = excluded.owner_id,
+    club_id = excluded.club_id,
+    meeting_number = excluded.meeting_number,
+    meeting_date = excluded.meeting_date,
+    prepared_winner = excluded.prepared_winner,
+    prepared_votes = excluded.prepared_votes,
+    impromptu_winner = excluded.impromptu_winner,
+    impromptu_votes = excluded.impromptu_votes,
+    evaluator_winner = excluded.evaluator_winner,
+    evaluator_votes = excluded.evaluator_votes;
 
   return jsonb_build_object('already_voted', false);
 end;

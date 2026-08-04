@@ -87,6 +87,36 @@
   color: white;
 }
 
+.tm-sidebar-menu {
+  display: grid;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.tm-nav-group {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 8px;
+  background: rgba(255,255,255,.05);
+}
+
+.tm-nav-group span {
+  color: rgba(255,255,255,.56);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 0 6px 4px;
+}
+
+.tm-nav-group button {
+  margin-bottom: 0;
+  padding: 11px 12px;
+  font-size: 14px;
+}
+
 .tm-club-switcher {
   display: grid;
   gap: 7px;
@@ -1619,6 +1649,24 @@
   .tm-sidebar button {
     white-space: nowrap;
     width: auto;
+  }
+
+  .tm-sidebar-menu {
+    display: flex;
+    gap: 8px;
+    margin-top: 0;
+  }
+
+  .tm-nav-group {
+    min-width: max-content;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .tm-nav-group span {
+    padding: 0 6px;
   }
 
   .tm-admin-grid,

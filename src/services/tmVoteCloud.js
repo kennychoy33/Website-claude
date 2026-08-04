@@ -960,8 +960,9 @@ async function saveVoteSetupWithSchemaFallback(meetingRow, candidateRows) {
 export async function submitVote(state, preparedId, impromptuId, evaluatorId, voterToken) {
   if (!isCloudConfigured) {
     const next = incrementLocalVotes(state, preparedId, impromptuId, evaluatorId)
-    saveLocalState(next)
-    return { data: next, source: 'local' }
+    const nextWithHistory = withVoteHistorySnapshot(next)
+    saveLocalState(nextWithHistory)
+    return { data: nextWithHistory, source: 'local' }
   }
 
   const meetingId = state.meeting.id || TM_VOTE_MEETING_ID
@@ -1011,6 +1012,43 @@ function incrementLocalVotes(state, preparedId, impromptuId, evaluatorId) {
     prepared: state.prepared.map(item => item.id === preparedId ? { ...item, votes: item.votes + 1 } : item),
     impromptu: state.impromptu.map(item => item.id === impromptuId ? { ...item, votes: item.votes + 1 } : item),
     evaluator: state.evaluator.map(item => item.id === evaluatorId ? { ...item, votes: item.votes + 1 } : item),
+  }
+}
+
+function topCandidate(list = []) {
+  const sorted = [...list].sort((a, b) => (b.votes || 0) - (a.votes || 0))
+  if (!sorted.length || !sorted[0].votes) return { name: '', votes: 0 }
+  const tied = sorted[1] && (sorted[1].votes || 0) === (sorted[0].votes || 0)
+  return { name: tied ? 'Tied' : sorted[0].name, votes: sorted[0].votes || 0 }
+}
+
+function voteHistorySnapshot(state) {
+  const prepared = topCandidate(state.prepared)
+  const impromptu = topCandidate(state.impromptu)
+  const evaluator = topCandidate(state.evaluator)
+  return {
+    id: state.meeting?.id || `${state.meeting?.number || ''}-${state.meeting?.date || ''}`,
+    meeting: state.meeting?.number || '',
+    date: state.meeting?.date || '',
+    preparedWinner: prepared.name,
+    preparedVotes: prepared.votes,
+    impromptuWinner: impromptu.name,
+    impromptuVotes: impromptu.votes,
+    evaluatorWinner: evaluator.name,
+    evaluatorVotes: evaluator.votes,
+  }
+}
+
+function withVoteHistorySnapshot(state) {
+  const snapshot = voteHistorySnapshot(state)
+  const key = `${snapshot.id || ''}|${snapshot.meeting}|${snapshot.date}`
+  const history = (state.history || []).filter(record => {
+    const recordKey = `${record.id || ''}|${record.meeting}|${record.date}`
+    return recordKey !== key
+  })
+  return {
+    ...state,
+    history: [snapshot, ...history],
   }
 }
 
@@ -1091,6 +1129,7 @@ function fromCandidateRow(row) {
 
 function fromHistoryRow(row) {
   return {
+    id: row.meeting_id || row.id,
     meeting: row.meeting_number,
     date: row.meeting_date,
     preparedWinner: row.prepared_winner,
