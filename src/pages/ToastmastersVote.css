@@ -25,6 +25,7 @@
 
 .tm-sidebar {
   min-height: 100vh;
+  max-height: 100vh;
   background: linear-gradient(180deg, #042746, #07345f);
   padding: 24px 18px;
   position: sticky;
@@ -32,6 +33,23 @@
   align-self: start;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.35) rgba(255,255,255,.08);
+}
+
+.tm-sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.tm-sidebar::-webkit-scrollbar-track {
+  background: rgba(255,255,255,.08);
+}
+
+.tm-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.35);
+  border-radius: 999px;
 }
 
 .tm-brand {
@@ -1655,8 +1673,10 @@
   .tm-sidebar {
     position: static;
     min-height: auto;
+    max-height: none;
     display: flex;
     overflow-x: auto;
+    overflow-y: visible;
     gap: 8px;
     padding: 14px;
   }
