@@ -202,6 +202,12 @@ export function getPublicVoteUrl(spaceId = '', clubId = getActiveClubId(), meeti
   return url.toString()
 }
 
+export function getPublicTimerUrl(spaceId = '', clubId = getActiveClubId(), meetingId = '') {
+  const url = new URL(getPublicVoteUrl(spaceId, clubId, meetingId))
+  url.searchParams.set('view', 'timer')
+  return url.toString()
+}
+
 function getMeetingId(spaceId = '', clubId = getActiveClubId()) {
   const clubPart = clubId && clubId !== 'default' ? `-${clubId}` : ''
   return spaceId ? `${spaceId}${clubPart}-${TM_VOTE_MEETING_ID}` : `${TM_VOTE_MEETING_ID}${clubPart}`
@@ -539,28 +545,31 @@ export async function saveSystemSettings(settings) {
   return { source: 'cloud' }
 }
 
-export async function loadPeopleState() {
+export async function loadPeopleState(spaceId = '', clubId = getActiveClubId()) {
   if (!isCloudConfigured) {
     return { data: loadLocalPeople(), source: 'local' }
   }
 
   const user = await getCurrentUser()
-  if (!user) {
+  const activeOwner = spaceId || user?.id
+  if (!activeOwner) {
     return { data: loadLocalPeople(), source: 'local' }
   }
+  const readClient = spaceId && !user ? (publicSupabase || supabase) : supabase
+  const activeClub = clubId || getActiveClubRowId()
 
   const [{ data: members, error: memberError }, { data: guests, error: guestError }] = await Promise.all([
-    supabase
+    readClient
       .from('tm_members')
       .select('*')
-      .eq('owner_id', user.id)
-      .eq('club_id', getActiveClubRowId())
+      .eq('owner_id', activeOwner)
+      .eq('club_id', activeClub)
       .order('name', { ascending: true }),
-    supabase
+    readClient
       .from('tm_guests')
       .select('*')
-      .eq('owner_id', user.id)
-      .eq('club_id', getActiveClubRowId())
+      .eq('owner_id', activeOwner)
+      .eq('club_id', activeClub)
       .order('visit_date', { ascending: false }),
   ])
 
@@ -661,27 +670,46 @@ export async function savePeopleState(state) {
   return { source: 'cloud' }
 }
 
-export async function loadMeetingOpsState(meetingId = '') {
+export async function loadMeetingOpsState(meetingId = '', spaceId = '', clubId = getActiveClubId()) {
   if (!isCloudConfigured) {
     return { data: loadLocalMeetingOps(), source: 'local' }
   }
 
   const user = await getCurrentUser()
-  if (!user) {
+  const activeOwner = spaceId || user?.id
+  if (!activeOwner) {
     return { data: loadLocalMeetingOps(), source: 'local' }
   }
 
-  const activeMeetingId = meetingId || getMeetingId(user.id)
-  const [{ data: attendance, error: attendanceError }, { data: roles, error: rolesError }] = await Promise.all([
-    supabase
-      .from('tm_meeting_attendance')
-      .select('*')
-      .eq('owner_id', user.id)
-      .eq('meeting_id', activeMeetingId),
-    supabase
+  const activeMeetingId = meetingId || getMeetingId(activeOwner, clubId)
+  const readClient = spaceId && !user ? (publicSupabase || supabase) : supabase
+  if (spaceId && !user) {
+    const { data: roles, error: rolesError } = await readClient
       .from('tm_meeting_roles')
       .select('*')
-      .eq('owner_id', user.id)
+      .eq('owner_id', activeOwner)
+      .eq('meeting_id', activeMeetingId)
+      .order('created_at', { ascending: true })
+    if (rolesError) throw rolesError
+    return {
+      data: {
+        attendance: [],
+        roles: roles.length ? roles.map(fromRoleRow) : seedMeetingOpsState.roles,
+      },
+      source: 'cloud',
+    }
+  }
+
+  const [{ data: attendance, error: attendanceError }, { data: roles, error: rolesError }] = await Promise.all([
+    readClient
+      .from('tm_meeting_attendance')
+      .select('*')
+      .eq('owner_id', activeOwner)
+      .eq('meeting_id', activeMeetingId),
+    readClient
+      .from('tm_meeting_roles')
+      .select('*')
+      .eq('owner_id', activeOwner)
       .eq('meeting_id', activeMeetingId)
       .order('created_at', { ascending: true }),
   ])
@@ -749,6 +777,78 @@ export async function saveMeetingOpsState(state, meetingId = '') {
   }
 
   return { source: 'cloud' }
+}
+
+function localTimerKey(meetingId = '') {
+  return `${TM_VOTE_STORAGE_KEY}-timer-records-${meetingId || 'current'}`
+}
+
+function loadLocalTimerRecords(meetingId = '') {
+  try {
+    return JSON.parse(localStorage.getItem(localTimerKey(meetingId)) || '[]')
+  } catch {
+    return []
+  }
+}
+
+function saveLocalTimerRecords(meetingId = '', records = []) {
+  localStorage.setItem(localTimerKey(meetingId), JSON.stringify(records))
+}
+
+export async function loadTimerRecordsState(meetingId = '', spaceId = '', clubId = getActiveClubId()) {
+  if (!isCloudConfigured) {
+    return { data: loadLocalTimerRecords(meetingId), source: 'local' }
+  }
+
+  const user = await getCurrentUser()
+  const activeOwner = spaceId || user?.id
+  if (!activeOwner || !meetingId) {
+    return { data: loadLocalTimerRecords(meetingId), source: 'local' }
+  }
+
+  const readClient = spaceId && !user ? (publicSupabase || supabase) : supabase
+  const { data, error } = await readClient
+    .from('tm_timer_records')
+    .select('*')
+    .eq('owner_id', activeOwner)
+    .eq('club_id', clubId || 'default')
+    .eq('meeting_id', meetingId)
+    .order('created_at', { ascending: false })
+
+  if (isMissingSchemaError(error)) {
+    return { data: loadLocalTimerRecords(meetingId), source: 'local' }
+  }
+  if (error) throw error
+
+  return { data: (data || []).map(fromTimerRecordRow), source: 'cloud' }
+}
+
+export async function saveTimerRecordState(record, meetingId = '', spaceId = '', clubId = getActiveClubId()) {
+  const nextLocal = [record, ...loadLocalTimerRecords(meetingId).filter(item => item.id !== record.id)].slice(0, 120)
+  saveLocalTimerRecords(meetingId, nextLocal)
+
+  if (!isCloudConfigured) {
+    return { data: nextLocal, source: 'local' }
+  }
+
+  const user = await getCurrentUser()
+  const activeOwner = spaceId || user?.id
+  if (!activeOwner || !meetingId) {
+    return { data: nextLocal, source: 'local' }
+  }
+
+  const writeClient = spaceId && !user ? (publicSupabase || supabase) : supabase
+  const { error } = await writeClient
+    .from('tm_timer_records')
+    .insert(toTimerRecordRow(record, activeOwner, meetingId, clubId || 'default'))
+
+  if (isMissingSchemaError(error) || isRowLevelSecurityError(error)) {
+    return { data: nextLocal, source: 'local' }
+  }
+  if (error) throw error
+
+  const refreshed = await loadTimerRecordsState(meetingId, spaceId, clubId)
+  return refreshed
 }
 
 function normalizeMeetingIdForOwner(meetingId, ownerId) {
@@ -1275,6 +1375,41 @@ function fromRoleRow(row) {
     time: row.role_time || '',
     personType: row.person_type,
     personId: row.person_id,
+  }
+}
+
+function toTimerRecordRow(record, ownerId, meetingId, clubId) {
+  return {
+    id: record.id,
+    owner_id: ownerId,
+    club_id: clubId || 'default',
+    meeting_id: meetingId,
+    item_id: record.itemId || '',
+    item_type: record.itemType || '',
+    summary: record.summary || '',
+    person: record.person || '',
+    planned_duration: record.duration || '',
+    elapsed_seconds: Math.round(record.elapsed || 0),
+    light: record.light || '',
+    light_label: record.lightLabel || '',
+    started_at: record.startedAt || null,
+    ended_at: record.endedAt || new Date().toISOString(),
+  }
+}
+
+function fromTimerRecordRow(row) {
+  return {
+    id: row.id,
+    itemId: row.item_id || '',
+    itemType: row.item_type || '',
+    summary: row.summary || '',
+    person: row.person || '',
+    duration: row.planned_duration || '',
+    elapsed: row.elapsed_seconds || 0,
+    light: row.light || '',
+    lightLabel: row.light_label || '',
+    startedAt: row.started_at || '',
+    endedAt: row.ended_at || row.created_at || '',
   }
 }
 

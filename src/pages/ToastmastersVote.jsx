@@ -4,6 +4,7 @@ import {
   getOrCreateVoterToken,
   getCurrentUser,
   getLocalWorkspaceId,
+  getPublicTimerUrl,
   getPublicVoteUrl,
   getRememberedWorkspaceId,
   getActiveClubId,
@@ -12,6 +13,7 @@ import {
   loadMeetingOpsState,
   loadMeetingRecordsState,
   loadPeopleState,
+  loadTimerRecordsState,
   loadLocalState,
   loadRuntimeCloudConfig,
   loadSystemSettings,
@@ -23,6 +25,7 @@ import {
   saveMeetingOpsState,
   savePeopleState,
   saveRuntimeCloudConfig,
+  saveTimerRecordState,
   setActiveClubId,
   seedPeopleState,
   saveSystemSettings,
@@ -114,6 +117,8 @@ const LANG = {
     addImpromptu: '+ 添加即席讲员',
     addEvaluator: '+ 添加评估员',
     voteLink: '投票链接',
+    timerLink: '计时员链接',
+    copyTimerLink: '复制计时员链接',
     scanVote: '扫码投票',
     copyLink: '复制链接',
     downloadPoster: '下载分享图片',
@@ -314,6 +319,8 @@ const LANG = {
     addImpromptu: '+ Add Table Topics Speaker',
     addEvaluator: '+ Add Evaluator',
     voteLink: 'Voting Link',
+    timerLink: 'Timer Link',
+    copyTimerLink: 'Copy Timer Link',
     scanVote: 'Scan to Vote',
     copyLink: 'Copy Link',
     downloadPoster: 'Download Share Image',
@@ -1477,7 +1484,7 @@ function timerLight(elapsedSeconds, targets) {
   return { key: 'idle', label: 'Ready', text: '准备' }
 }
 
-function TimerView({ data, people, meetingOps, settings, t }) {
+function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId = 'default', publicTimer = false, timerLink = '' }) {
   const uiLang = t.langLabel === 'Language' ? 'en' : 'zh'
   const agendaRows = standardAgendaScheduleRows(agendaRowsFromTemplate(settings, meetingOps.roles), people, data, uiLang)
   const flowItems = agendaRows.filter(item => !item.section)
@@ -1486,13 +1493,8 @@ function TimerView({ data, people, meetingOps, settings, t }) {
   const [baseElapsed, setBaseElapsed] = useState(0)
   const [startedAt, setStartedAt] = useState(null)
   const [now, setNow] = useState(Date.now())
-  const [records, setRecords] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(timerRecordKey(data.meeting?.id)) || '[]')
-    } catch {
-      return []
-    }
-  })
+  const [records, setRecords] = useState([])
+  const [timerStatus, setTimerStatus] = useState('')
   const activeItem = flowItems.find(item => item.id === activeId) || flowItems[0] || {}
   const activeTargets = timerTargets(activeItem)
   const elapsed = startedAt ? baseElapsed + ((now - startedAt) / 1000) : baseElapsed
@@ -1510,22 +1512,27 @@ function TimerView({ data, people, meetingOps, settings, t }) {
   }, [startedAt])
 
   useEffect(() => {
-    setRecords(() => {
+    let ignore = false
+    async function hydrateTimerRecords() {
       try {
-        return JSON.parse(localStorage.getItem(timerRecordKey(data.meeting?.id)) || '[]')
+        const result = await loadTimerRecordsState(data.meeting?.id, publicTimer ? spaceId : '', clubId)
+        if (!ignore) setRecords(result.data || [])
       } catch {
-        return []
+        if (!ignore) {
+          try {
+            setRecords(JSON.parse(localStorage.getItem(timerRecordKey(data.meeting?.id)) || '[]'))
+          } catch {
+            setRecords([])
+          }
+        }
       }
-    })
+    }
+    hydrateTimerRecords()
     setActiveId(firstId)
     setBaseElapsed(0)
     setStartedAt(null)
-  }, [data.meeting?.id, firstId])
-
-  function persistRecords(next) {
-    setRecords(next)
-    localStorage.setItem(timerRecordKey(data.meeting?.id), JSON.stringify(next))
-  }
+    return () => { ignore = true }
+  }, [data.meeting?.id, firstId, publicTimer, spaceId, clubId])
 
   function selectItem(id) {
     setActiveId(id)
@@ -1552,22 +1559,34 @@ function TimerView({ data, people, meetingOps, settings, t }) {
     setNow(Date.now())
   }
 
-  function endTimer() {
+  async function endTimer() {
     if (!activeItem.id) return
     const finalElapsed = elapsed
     const finalLight = timerLight(finalElapsed, activeTargets)
     const record = {
       id: `${activeItem.id}-${Date.now()}`,
       itemId: activeItem.id,
+      itemType: canonicalAgendaRoleKey(activeItem.roleName || activeItem.id || ''),
       summary: activeItem.summary,
       person: activeItem.person,
       duration: activeItem.duration,
       elapsed: Math.round(finalElapsed),
       light: finalLight.key,
       lightLabel: uiLang === 'zh' ? finalLight.text : finalLight.label,
+      startedAt: startedAt ? new Date(startedAt).toISOString() : '',
       endedAt: new Date().toISOString(),
     }
-    persistRecords([record, ...records].slice(0, 80))
+    const optimistic = [record, ...records].slice(0, 80)
+    setRecords(optimistic)
+    localStorage.setItem(timerRecordKey(data.meeting?.id), JSON.stringify(optimistic))
+    setTimerStatus('Saving...')
+    try {
+      const result = await saveTimerRecordState(record, data.meeting?.id, publicTimer ? spaceId : '', clubId)
+      setRecords(result.data || optimistic)
+      setTimerStatus(result.source === 'cloud' ? 'Saved' : 'Saved on this device')
+    } catch (err) {
+      setTimerStatus(err.message || 'Saved on this device')
+    }
     resetTimer()
   }
 
@@ -1589,7 +1608,14 @@ function TimerView({ data, people, meetingOps, settings, t }) {
         <div>
           <h1>{t.navTimer}</h1>
           <p>{data.meeting.number || t.currentMeeting} {t.regularMeeting} | {data.meeting.date}</p>
+          {timerStatus && <div className="tm-sync-badge"><b>{timerStatus}</b></div>}
+          {!publicTimer && timerLink && <div className="tm-sync-badge"><b>{t.timerLink}</b><span>{timerLink}</span></div>}
         </div>
+        {!publicTimer && timerLink && (
+          <div className="tm-actions">
+            <button onClick={() => navigator.clipboard?.writeText(timerLink)}>{t.copyTimerLink}</button>
+          </div>
+        )}
       </div>
 
       <div className="tm-timer-layout">
@@ -3367,16 +3393,19 @@ export default function ToastmastersVote() {
     agendaLanguage: 'auto',
     clubAdmins: [],
   })
-  const publicView = new URLSearchParams(window.location.search).get('view') === 'vote'
+  const publicMode = new URLSearchParams(window.location.search).get('view') || ''
+  const publicView = publicMode === 'vote'
+  const publicTimerView = publicMode === 'timer'
+  const publicToolView = publicView || publicTimerView
   const publicSpace = new URLSearchParams(window.location.search).get('space') || ''
   const publicClub = new URLSearchParams(window.location.search).get('club') || 'default'
-  const [view, setView] = useState(publicView ? 'vote' : 'system')
+  const [view, setView] = useState(publicView ? 'vote' : publicTimerView ? 'timer' : 'system')
   const [lang, setLang] = useState(() => localStorage.getItem('tm-vote-lang') || 'zh')
   const [managedClubs, setManagedClubs] = useState(() => loadManagedClubs())
-  const [selectedClubId, setSelectedClubId] = useState(() => publicView ? publicClub : getActiveClubId())
+  const [selectedClubId, setSelectedClubId] = useState(() => publicToolView ? publicClub : getActiveClubId())
   const [openNavGroups, setOpenNavGroups] = useState({})
   const [user, setUser] = useState(null)
-  const [authReady, setAuthReady] = useState(!isCloudConfigured || publicView)
+  const [authReady, setAuthReady] = useState(!isCloudConfigured || publicToolView)
   const [source, setSource] = useState(isCloudConfigured ? 'cloud' : 'local')
   const [syncStatus, setSyncStatus] = useState('')
   const t = LANG[lang]
@@ -3389,6 +3418,9 @@ export default function ToastmastersVote() {
   const effectiveVoteLink = publicView
     ? window.location.href
     : data?.meeting?.link || getPublicVoteUrl(workspaceId, selectedClubId, data?.meeting?.id || '')
+  const effectiveTimerLink = publicTimerView
+    ? window.location.href
+    : getPublicTimerUrl(workspaceId, selectedClubId, data?.meeting?.id || '')
 
   useEffect(() => {
     setActiveClubId(selectedClubId)
@@ -3399,7 +3431,7 @@ export default function ToastmastersVote() {
   }, [user])
 
   useEffect(() => {
-    if (!isCloudConfigured || publicView) return undefined
+    if (!isCloudConfigured || publicToolView) return undefined
     let mounted = true
     getCurrentUser().then(currentUser => {
       if (!mounted) return
@@ -3414,16 +3446,16 @@ export default function ToastmastersVote() {
       mounted = false
       unsubscribe()
     }
-  }, [publicView])
+  }, [publicToolView])
 
   useEffect(() => {
     let ignore = false
     async function hydrate() {
-      if (!authReady || (!publicView && isCloudConfigured && !user)) return
+      if (!authReady || (!publicToolView && isCloudConfigured && !user)) return
       setSyncStatus(t.syncing)
       try {
-        setActiveClubId(publicView ? publicClub : selectedClubId)
-        const result = await loadVoteState(publicView ? publicSpace : '', publicView ? publicClub : selectedClubId)
+        setActiveClubId(publicToolView ? publicClub : selectedClubId)
+        const result = await loadVoteState(publicToolView ? publicSpace : '', publicToolView ? publicClub : selectedClubId)
         if (!ignore) {
           setData(normalizeState(result.data))
           setSource(result.source)
@@ -3439,15 +3471,15 @@ export default function ToastmastersVote() {
     }
     hydrate()
     return () => { ignore = true }
-  }, [authReady, user, publicView, publicSpace, publicClub, selectedClubId])
+  }, [authReady, user, publicToolView, publicSpace, publicClub, selectedClubId])
 
   useEffect(() => {
     let ignore = false
     async function hydratePeople() {
-      if (publicView || !authReady || (isCloudConfigured && !user)) return
+      if ((!publicTimerView && publicView) || !authReady || (!publicTimerView && isCloudConfigured && !user)) return
       try {
-        setActiveClubId(selectedClubId)
-        const result = await loadPeopleState()
+        setActiveClubId(publicTimerView ? publicClub : selectedClubId)
+        const result = await loadPeopleState(publicTimerView ? publicSpace : '', publicTimerView ? publicClub : selectedClubId)
         if (!ignore) {
           setPeople(result.data)
           if (result.warning) setSyncStatus(result.warning)
@@ -3458,15 +3490,15 @@ export default function ToastmastersVote() {
     }
     hydratePeople()
     return () => { ignore = true }
-  }, [authReady, user, publicView, selectedClubId])
+  }, [authReady, user, publicView, publicTimerView, publicSpace, publicClub, selectedClubId])
 
   useEffect(() => {
     let ignore = false
     async function hydrateSettings() {
-      if (!authReady || (!publicView && isCloudConfigured && !user)) return
+      if (!authReady || (!publicToolView && isCloudConfigured && !user)) return
       try {
-        setActiveClubId(publicView ? publicClub : selectedClubId)
-        const result = await loadSystemSettings(publicView ? publicSpace : '')
+        setActiveClubId(publicToolView ? publicClub : selectedClubId)
+        const result = await loadSystemSettings(publicToolView ? publicSpace : '')
         if (!ignore) {
           const fallbackToastmasterId = result.data.toastmasterId || localStorage.getItem('tm-login-toastmaster-id') || selectedClubId || 'default'
           setSettings({
@@ -3485,15 +3517,15 @@ export default function ToastmastersVote() {
     }
     hydrateSettings()
     return () => { ignore = true }
-  }, [authReady, user, publicView, publicSpace, publicClub, selectedClubId])
+  }, [authReady, user, publicToolView, publicSpace, publicClub, selectedClubId])
 
   useEffect(() => {
     let ignore = false
     async function hydrateMeetingOps() {
-      if (publicView || !authReady || (isCloudConfigured && !user) || !data?.meeting?.id) return
+      if ((!publicTimerView && publicView) || !authReady || (!publicTimerView && isCloudConfigured && !user) || !data?.meeting?.id) return
       try {
-        setActiveClubId(selectedClubId)
-        const result = await loadMeetingOpsState(data.meeting.id)
+        setActiveClubId(publicTimerView ? publicClub : selectedClubId)
+        const result = await loadMeetingOpsState(data.meeting.id, publicTimerView ? publicSpace : '', publicTimerView ? publicClub : selectedClubId)
         if (!ignore) setMeetingOps(result.data)
       } catch {
         if (!ignore) setMeetingOps({ attendance: [], roles: [] })
@@ -3501,7 +3533,7 @@ export default function ToastmastersVote() {
     }
     hydrateMeetingOps()
     return () => { ignore = true }
-  }, [authReady, user, publicView, data?.meeting?.id, selectedClubId])
+  }, [authReady, user, publicView, publicTimerView, publicSpace, publicClub, data?.meeting?.id, selectedClubId])
 
   useEffect(() => {
     if (publicView || !authReady || (isCloudConfigured && !user) || !['results', 'history'].includes(view)) return undefined
@@ -3637,26 +3669,26 @@ export default function ToastmastersVote() {
   }, [navGroups, view])
 
   useEffect(() => {
-    if (!publicView && authReady && user && !canManageClubSettings && ['system', 'master'].includes(view)) {
+    if (!publicToolView && authReady && user && !canManageClubSettings && ['system', 'master'].includes(view)) {
       setView('meeting')
     }
-    if (!publicView && authReady && user && !superAdmin && view === 'master') {
+    if (!publicToolView && authReady && user && !superAdmin && view === 'master') {
       setView(canManageClubSettings ? 'system' : 'meeting')
     }
-  }, [authReady, user, publicView, view, superAdmin, canManageClubSettings])
+  }, [authReady, user, publicToolView, view, superAdmin, canManageClubSettings])
 
   if (!authReady) {
     return <div className="tm-success-card"><h2>{appText.syncing}</h2></div>
   }
 
-  if (!publicView && isCloudConfigured && !user) {
+  if (!publicToolView && isCloudConfigured && !user) {
     return <LoginView lang={lang} setLang={changeLang} t={t} onLogin={setUser} />
   }
 
   if (!data) {
     return (
-      <div className={`tm-page ${publicView ? 'public' : ''}`}>
-        {!publicView && <aside className="tm-sidebar">
+      <div className={`tm-page ${publicToolView ? 'public' : ''}`}>
+        {!publicToolView && <aside className="tm-sidebar">
           <div className="tm-brand">Toastmasters</div>
           <LanguageToggle lang={lang} setLang={changeLang} t={appText} />
         </aside>}
@@ -3667,7 +3699,7 @@ export default function ToastmastersVote() {
     )
   }
 
-  if (publicView && isCloudConfigured && !publicSpace) {
+  if (publicToolView && isCloudConfigured && !publicSpace) {
     return (
       <div className="tm-page public">
         <main className="tm-content">
@@ -3680,7 +3712,7 @@ export default function ToastmastersVote() {
     )
   }
 
-  if (publicView && !isCloudConfigured) {
+  if (publicToolView && !isCloudConfigured) {
     return (
       <div className="tm-page public">
         <main className="tm-content">
@@ -3695,8 +3727,8 @@ export default function ToastmastersVote() {
   }
 
   return (
-    <div className={`tm-page ${publicView ? 'public' : ''}`}>
-      {!publicView && <aside className="tm-sidebar">
+    <div className={`tm-page ${publicToolView ? 'public' : ''}`}>
+      {!publicToolView && <aside className="tm-sidebar">
         <div className="tm-brand">{appText.clubShort}</div>
         <LanguageToggle lang={lang} setLang={changeLang} t={appText} />
         <ClubSwitcher clubs={managedClubs} selectedClubId={selectedClubId} onChange={switchClub} t={appText} disabled={!superAdmin} />
@@ -3730,7 +3762,7 @@ export default function ToastmastersVote() {
         {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} meetingOps={meetingOps} spaceId={workspaceId} voteLink={effectiveVoteLink} />}
         {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={appText} />}
         {view === 'meeting' && <MeetingView data={data} setData={setData} persistState={persistState} people={people} setPeople={setPeople} persistPeople={persistPeople} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={appText} settings={settings} voteLink={effectiveVoteLink} />}
-        {view === 'timer' && <TimerView data={data} people={people} meetingOps={meetingOps} settings={settings} t={appText} />}
+        {view === 'timer' && <TimerView data={data} people={people} meetingOps={meetingOps} settings={settings} t={appText} spaceId={workspaceId} clubId={publicTimerView ? publicClub : selectedClubId} publicTimer={publicTimerView} timerLink={effectiveTimerLink} />}
         {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={appText} spaceId={workspaceId} />}
         {view === 'success' && <div className="tm-success-card"><h1>{appText.thankVote}</h1><p>{appText.recorded}</p></div>}
         {view === 'share' && <SharePoster data={data} t={appText} voteLink={effectiveVoteLink} />}

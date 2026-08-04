@@ -40,6 +40,10 @@ create table if not exists public.tm_meeting_roles (
   id uuid primary key default gen_random_uuid()
 );
 
+create table if not exists public.tm_timer_records (
+  id text primary key
+);
+
 alter table public.tm_meetings
   add column if not exists owner_id uuid references auth.users(id) on delete cascade,
   add column if not exists club_id text not null default 'default',
@@ -154,6 +158,22 @@ alter table public.tm_meeting_roles
   add column if not exists person_id text,
   add column if not exists created_at timestamptz not null default now();
 
+alter table public.tm_timer_records
+  add column if not exists owner_id uuid references auth.users(id) on delete cascade,
+  add column if not exists club_id text not null default 'default',
+  add column if not exists meeting_id text references public.tm_meetings(id) on delete cascade,
+  add column if not exists item_id text,
+  add column if not exists item_type text,
+  add column if not exists summary text,
+  add column if not exists person text,
+  add column if not exists planned_duration text,
+  add column if not exists elapsed_seconds integer not null default 0,
+  add column if not exists light text,
+  add column if not exists light_label text,
+  add column if not exists started_at timestamptz,
+  add column if not exists ended_at timestamptz,
+  add column if not exists created_at timestamptz not null default now();
+
 alter table public.tm_candidates drop constraint if exists tm_candidates_category_check;
 alter table public.tm_candidates
   add constraint tm_candidates_category_check
@@ -172,6 +192,8 @@ create index if not exists tm_members_owner_idx on public.tm_members(owner_id);
 create index if not exists tm_guests_owner_idx on public.tm_guests(owner_id);
 create index if not exists tm_attendance_owner_meeting_idx on public.tm_meeting_attendance(owner_id, meeting_id);
 create index if not exists tm_roles_owner_meeting_idx on public.tm_meeting_roles(owner_id, meeting_id);
+create index if not exists tm_timer_records_owner_meeting_idx on public.tm_timer_records(owner_id, meeting_id);
+create index if not exists tm_timer_records_meeting_idx on public.tm_timer_records(meeting_id, created_at desc);
 create index if not exists tm_club_settings_owner_idx on public.tm_club_settings(owner_id);
 create index if not exists tm_club_admins_owner_idx on public.tm_club_admins(owner_id);
 create index if not exists tm_members_owner_club_idx on public.tm_members(owner_id, club_id);
@@ -458,6 +480,7 @@ alter table public.tm_members enable row level security;
 alter table public.tm_guests enable row level security;
 alter table public.tm_meeting_attendance enable row level security;
 alter table public.tm_meeting_roles enable row level security;
+alter table public.tm_timer_records enable row level security;
 
 drop policy if exists "tm meetings public read" on public.tm_meetings;
 drop policy if exists "tm meetings public write" on public.tm_meetings;
@@ -474,8 +497,14 @@ drop policy if exists "tm club settings owner all" on public.tm_club_settings;
 drop policy if exists "tm club admins owner all" on public.tm_club_admins;
 drop policy if exists "tm members owner all" on public.tm_members;
 drop policy if exists "tm guests owner all" on public.tm_guests;
+drop policy if exists "tm members public read" on public.tm_members;
+drop policy if exists "tm guests public read" on public.tm_guests;
+drop policy if exists "tm roles public read" on public.tm_meeting_roles;
 drop policy if exists "tm attendance owner all" on public.tm_meeting_attendance;
 drop policy if exists "tm roles owner all" on public.tm_meeting_roles;
+drop policy if exists "tm timer records public read" on public.tm_timer_records;
+drop policy if exists "tm timer records public insert" on public.tm_timer_records;
+drop policy if exists "tm timer records owner all" on public.tm_timer_records;
 
 create policy "tm meetings public read"
 on public.tm_meetings for select
@@ -570,11 +599,21 @@ to authenticated
 using (owner_id = (select auth.uid()))
 with check (owner_id = (select auth.uid()));
 
+create policy "tm members public read"
+on public.tm_members for select
+to anon, authenticated
+using (true);
+
 create policy "tm members owner all"
 on public.tm_members for all
 to authenticated
 using (owner_id = (select auth.uid()))
 with check (owner_id = (select auth.uid()));
+
+create policy "tm guests public read"
+on public.tm_guests for select
+to anon, authenticated
+using (true);
 
 create policy "tm guests owner all"
 on public.tm_guests for all
@@ -588,8 +627,29 @@ to authenticated
 using (owner_id = (select auth.uid()))
 with check (owner_id = (select auth.uid()));
 
+create policy "tm roles public read"
+on public.tm_meeting_roles for select
+to anon, authenticated
+using (true);
+
 create policy "tm roles owner all"
 on public.tm_meeting_roles for all
+to authenticated
+using (owner_id = (select auth.uid()))
+with check (owner_id = (select auth.uid()));
+
+create policy "tm timer records public read"
+on public.tm_timer_records for select
+to anon, authenticated
+using (true);
+
+create policy "tm timer records public insert"
+on public.tm_timer_records for insert
+to anon, authenticated
+with check (true);
+
+create policy "tm timer records owner all"
+on public.tm_timer_records for all
 to authenticated
 using (owner_id = (select auth.uid()))
 with check (owner_id = (select auth.uid()));
@@ -607,8 +667,13 @@ grant select on public.tm_club_settings to anon;
 grant all on public.tm_club_admins to authenticated;
 grant all on public.tm_members to authenticated;
 grant all on public.tm_guests to authenticated;
+grant select on public.tm_members to anon;
+grant select on public.tm_guests to anon;
 grant all on public.tm_meeting_attendance to authenticated;
 grant all on public.tm_meeting_roles to authenticated;
+grant select on public.tm_meeting_roles to anon;
+grant select, insert on public.tm_timer_records to anon, authenticated;
+grant all on public.tm_timer_records to authenticated;
 grant execute on function public.tm_submit_vote(text, text, text, text, text) to anon, authenticated;
 grant execute on function public.tm_save_meeting(text, text, text, text, text, text, text, text, text) to authenticated;
 grant execute on function public.tm_save_vote_setup(jsonb, jsonb) to authenticated;
