@@ -2338,6 +2338,7 @@ function agendaRowsFromTemplate(settings, roles = []) {
 function canonicalAgendaRoleKey(roleName = '') {
   const text = normalizeAgendaText(roleName)
   if (!text) return ''
+  if (text.includes('table topics evaluation') || text.includes('table topics evaluator') || text.includes('即席评论员') || text.includes('即席评论')) return 'topics-evaluator'
   if (text.includes('sergeant') || text.includes('礼宾司')) return 'sergeant'
   if (text.includes('president') || text.includes('会长')) return 'president'
   if (text.includes('toastmaster of the evening') || text.includes('例会主持') || text.includes('司仪')) return 'toastmaster'
@@ -2544,6 +2545,7 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh', options = {
   const presidentRole = byKey.get('president')
   const technicalRole = byKey.get('technical')
   const generalEvaluatorRole = byKey.get('general-evaluator')
+  const topicsEvaluatorRole = byKey.get('topics-evaluator')
 
   const flow = [
     rowFor('technical', text('技术经理', 'Technical Manager'), '15', 'technical', technicalRole, '7:15PM'),
@@ -2562,7 +2564,7 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh', options = {
     rowFor('break', text('交流时间', 'Networking Break'), '8', 'toastmaster', toastmasterRole, '8:52PM'),
     { section: text('评论（由总评论承接）', 'Evaluation Session') },
     ...evaluatorRows,
-    rowFor('topics-evaluation', text('即席评论', 'Table Topics Evaluation'), '5-7', 'general-evaluator', generalEvaluatorRole, '9:12PM'),
+    rowFor('topics-evaluation', text('即席评论', 'Table Topics Evaluation'), '5-7', 'topics-evaluator', topicsEvaluatorRole, '9:12PM'),
     rowFor('timer-report-3', text('计时报告', 'Timer Report'), '1', 'timer', timerRole, '9:19PM'),
     rowFor('vote', text('投票环节', 'Voting Session'), '1', 'toastmaster', toastmasterRole, '9:20PM'),
     rowFor('grammarian-report', text('语言评论', 'Grammarian Report'), '3-5', 'grammarian', null, '9:25PM'),
@@ -2765,6 +2767,8 @@ function findExistingPersonByName(name, people) {
 function ensureAgendaPeople(text, people) {
   const lines = String(text || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean)
   const namePatterns = [
+    /技术经理\s*[：:]\s*(.+)$/,
+    /即席评论员\s*[：:]\s*(.+)$/,
     /会长致开\/休会词\s*[：:]\s*([^,，]+)/,
     /登记\/交流\/礼宾司\s*[：:]\s*(.+)$/,
     /司仪\s*[：:]\s*(.+)$/,
@@ -2806,6 +2810,8 @@ function importAgendaTextToRoles(text, roles, people) {
   if (!lines.length) return roles
 
   const directAssignments = [
+    { key: 'technical', patterns: [/技术经理\s*[：:]\s*(.+)$/, /技术经理\s*(?:是|为)?\s*[：:]?\s*(.+)$/] },
+    { key: 'topics-evaluator', patterns: [/即席评论员\s*[：:]\s*(.+)$/, /即席评论\s*[：:]\s*(.+)$/] },
     { key: 'president', patterns: [/会长致开\/休会词\s*[：:]\s*([^,，]+)/] },
     { key: 'sergeant', patterns: [/登记\/交流\/礼宾司\s*[：:]\s*(.+)$/] },
     { key: 'toastmaster', patterns: [/司仪\s*[：:]\s*(.+)$/] },
@@ -2835,6 +2841,13 @@ function importAgendaTextToRoles(text, roles, people) {
     nextRoles = [
       ...nextRoles,
       { id: `r${Date.now()}technical`, roleName: '技术经理', time: '', personType: 'member', personId: '' },
+    ]
+  }
+
+  if (personForKey.has('topics-evaluator') && !existingKeys.has('topics-evaluator')) {
+    nextRoles = [
+      ...nextRoles,
+      { id: `r${Date.now()}topicsEvaluator`, roleName: '即席评论员', time: '5', personType: 'member', personId: '' },
     ]
   }
 
