@@ -1946,9 +1946,7 @@
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-purpose {
-  padding: 1.2mm 2.2mm;
-  font-size: 10.8pt;
-  line-height: 1.16;
+  display: none;
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-purpose b {

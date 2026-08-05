@@ -2539,6 +2539,9 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh', options = {
     .map(key => byKey.get(key))
     .filter(Boolean)
     .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), agendaRoleSummary(role, people, data, lang), preparedDurations[index] || '5-7', canonicalAgendaRoleKey(role.roleName), role, preparedTimes[index] || '8:26PM'))
+  const printPreparedRows = options.compactPrint
+    ? preparedRows.filter(row => canonicalAgendaRoleKey(row.roleName) !== 'prepared-3' || row.person)
+    : preparedRows
   const evaluatorTimes = ['9:00PM', '9:04PM', '9:08PM']
   const evaluatorRows = ['evaluator-1', 'evaluator-2', 'evaluator-3']
     .map(key => byKey.get(key))
@@ -2563,7 +2566,7 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh', options = {
     rowFor('toastmaster', text('司仪介绍节目流程', 'Introduce the meeting program'), '8-10', 'toastmaster', toastmasterRole, '7:45PM'),
     rowFor('grammarian', text('语言评论员介绍每日一词', 'Grammarian introduces Word of the Day'), '5', 'grammarian', null, '7:55PM'),
     { section: text('演说环节', 'Prepared Speeches') },
-    ...preparedRows,
+    ...printPreparedRows,
     rowFor('timer-report-1', text('计时报告', 'Timer Report'), '1', 'timer', timerRole, '8:34PM'),
     rowFor('topics-master', text('即席主持', 'Table Topics Session'), '15', 'topics-master', null, '8:35PM'),
     ...(options.compactPrint ? [] : topicsRows),
