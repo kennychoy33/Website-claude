@@ -795,6 +795,22 @@ function saveLocalTimerRecords(meetingId = '', records = [], spaceId = '', clubI
   localStorage.setItem(localTimerKey(meetingId, spaceId, clubId), JSON.stringify(records))
 }
 
+function localTimerLiveKey(meetingId = '', spaceId = '', clubId = getActiveClubId()) {
+  return `${TM_VOTE_STORAGE_KEY}-timer-live-${spaceId || 'local'}-${clubId || 'default'}-${meetingId || 'current'}`
+}
+
+function loadLocalTimerLiveState(meetingId = '', spaceId = '', clubId = getActiveClubId()) {
+  try {
+    return JSON.parse(localStorage.getItem(localTimerLiveKey(meetingId, spaceId, clubId)) || 'null')
+  } catch {
+    return null
+  }
+}
+
+function saveLocalTimerLiveState(state = {}, meetingId = '', spaceId = '', clubId = getActiveClubId()) {
+  localStorage.setItem(localTimerLiveKey(meetingId, spaceId, clubId), JSON.stringify(state))
+}
+
 export async function loadTimerRecordsState(meetingId = '', spaceId = '', clubId = getActiveClubId()) {
   if (!isCloudConfigured) {
     return { data: loadLocalTimerRecords(meetingId, spaceId, clubId), source: 'local' }
@@ -813,6 +829,7 @@ export async function loadTimerRecordsState(meetingId = '', spaceId = '', clubId
     .eq('owner_id', activeOwner)
     .eq('club_id', clubId || 'default')
     .eq('meeting_id', meetingId)
+    .neq('item_type', 'live-state')
     .order('created_at', { ascending: false })
 
   if (isMissingSchemaError(error)) {
@@ -821,6 +838,93 @@ export async function loadTimerRecordsState(meetingId = '', spaceId = '', clubId
   if (error) throw error
 
   return { data: (data || []).map(fromTimerRecordRow), source: 'cloud' }
+}
+
+export async function loadTimerLiveState(meetingId = '', spaceId = '', clubId = getActiveClubId()) {
+  if (!isCloudConfigured) {
+    return { data: loadLocalTimerLiveState(meetingId, spaceId, clubId), source: 'local' }
+  }
+
+  const user = await getCurrentUser()
+  const activeOwner = spaceId || user?.id
+  if (!activeOwner || !meetingId) {
+    return { data: loadLocalTimerLiveState(meetingId, spaceId, clubId), source: 'local' }
+  }
+
+  const readClient = spaceId && !user ? (publicSupabase || supabase) : supabase
+  const { data, error } = await readClient
+    .from('tm_timer_records')
+    .select('*')
+    .eq('owner_id', activeOwner)
+    .eq('club_id', clubId || 'default')
+    .eq('meeting_id', meetingId)
+    .eq('item_type', 'live-state')
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (isMissingSchemaError(error)) {
+    return { data: loadLocalTimerLiveState(meetingId, spaceId, clubId), source: 'local' }
+  }
+  if (error) throw error
+
+  const row = data?.[0]
+  if (!row) return { data: loadLocalTimerLiveState(meetingId, spaceId, clubId), source: 'cloud' }
+  return {
+    data: {
+      activeId: row.item_id || '',
+      baseElapsed: row.elapsed_seconds || 0,
+      startedAt: row.started_at || '',
+      status: row.light || 'idle',
+      updatedAt: row.ended_at || row.created_at || '',
+    },
+    source: 'cloud',
+  }
+}
+
+export async function saveTimerLiveState(state = {}, meetingId = '', spaceId = '', clubId = getActiveClubId()) {
+  const nextLocal = {
+    activeId: state.activeId || '',
+    baseElapsed: Math.round(state.baseElapsed || 0),
+    startedAt: state.startedAt || '',
+    status: state.status || 'idle',
+    updatedAt: new Date().toISOString(),
+  }
+  saveLocalTimerLiveState(nextLocal, meetingId, spaceId, clubId)
+
+  if (!isCloudConfigured) {
+    return { data: nextLocal, source: 'local' }
+  }
+
+  const user = await getCurrentUser()
+  const activeOwner = spaceId || user?.id
+  if (!activeOwner || !meetingId) {
+    return { data: nextLocal, source: 'local' }
+  }
+
+  const writeClient = spaceId && !user ? (publicSupabase || supabase) : supabase
+  const liveRecord = {
+    id: `live-${activeOwner}-${clubId || 'default'}-${meetingId}-${Date.now()}`,
+    itemId: nextLocal.activeId,
+    itemType: 'live-state',
+    summary: 'Timer live state',
+    person: '',
+    duration: '',
+    elapsed: nextLocal.baseElapsed,
+    light: nextLocal.status,
+    lightLabel: nextLocal.status,
+    startedAt: nextLocal.startedAt || null,
+    endedAt: nextLocal.updatedAt,
+  }
+  const { error } = await writeClient
+    .from('tm_timer_records')
+    .insert(toTimerRecordRow(liveRecord, activeOwner, meetingId, clubId || 'default'))
+
+  if (isMissingSchemaError(error) || isRowLevelSecurityError(error)) {
+    return { data: nextLocal, source: 'local' }
+  }
+  if (error) throw error
+
+  return { data: nextLocal, source: 'cloud' }
 }
 
 export async function saveTimerRecordState(record, meetingId = '', spaceId = '', clubId = getActiveClubId()) {

@@ -13,6 +13,7 @@ import {
   loadMeetingOpsState,
   loadMeetingRecordsState,
   loadPeopleState,
+  loadTimerLiveState,
   loadTimerRecordsState,
   loadLocalState,
   loadRuntimeCloudConfig,
@@ -25,6 +26,7 @@ import {
   saveMeetingOpsState,
   savePeopleState,
   saveRuntimeCloudConfig,
+  saveTimerLiveState,
   saveTimerRecordState,
   setActiveClubId,
   seedPeopleState,
@@ -1568,30 +1570,84 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
     return () => { ignore = true }
   }, [timerMeetingId, timerStorageKey, firstId, spaceId, clubId])
 
+  function applyTimerLiveState(state = {}) {
+    if (!state?.activeId) return
+    const exists = flowItems.some(item => item.id === state.activeId)
+    if (!exists) return
+    setActiveId(state.activeId)
+    setBaseElapsed(Number(state.baseElapsed) || 0)
+    setStartedAt(state.startedAt ? new Date(state.startedAt).getTime() : null)
+    setNow(Date.now())
+    setTimerFocus(true)
+  }
+
+  async function publishTimerLiveState(nextState = {}) {
+    try {
+      await saveTimerLiveState(nextState, timerMeetingId, spaceId, clubId)
+    } catch (err) {
+      setTimerStatus(err.message || 'Timer sync failed')
+    }
+  }
+
+  useEffect(() => {
+    let ignore = false
+    async function hydrateTimerLiveState() {
+      try {
+        const result = await loadTimerLiveState(timerMeetingId, spaceId, clubId)
+        if (!ignore && result.data) applyTimerLiveState(result.data)
+      } catch {
+        // Timer can still run locally if live sync is unavailable.
+      }
+    }
+    hydrateTimerLiveState()
+    if (!publicTimer) return () => { ignore = true }
+    const timer = setInterval(hydrateTimerLiveState, 2000)
+    return () => {
+      ignore = true
+      clearInterval(timer)
+    }
+  }, [timerMeetingId, spaceId, clubId, publicTimer, firstId])
+
   function selectItem(id) {
     setActiveId(id)
     setBaseElapsed(0)
     setStartedAt(null)
     setNow(Date.now())
     setTimerFocus(true)
+    publishTimerLiveState({ activeId: id, baseElapsed: 0, startedAt: '', status: 'selected' })
   }
 
   function startTimer() {
     if (!activeItem.id || startedAt) return
-    setStartedAt(Date.now())
+    const startTime = Date.now()
+    setStartedAt(startTime)
     setNow(Date.now())
+    publishTimerLiveState({
+      activeId: activeItem.id,
+      baseElapsed,
+      startedAt: new Date(startTime).toISOString(),
+      status: 'running',
+    })
   }
 
   function pauseTimer() {
     if (!startedAt) return
+    const pausedElapsed = elapsed
     setBaseElapsed(elapsed)
     setStartedAt(null)
+    publishTimerLiveState({
+      activeId: activeItem.id,
+      baseElapsed: Math.round(pausedElapsed),
+      startedAt: '',
+      status: 'paused',
+    })
   }
 
   function resetTimer() {
     setBaseElapsed(0)
     setStartedAt(null)
     setNow(Date.now())
+    publishTimerLiveState({ activeId: activeItem.id, baseElapsed: 0, startedAt: '', status: 'idle' })
   }
 
   async function endTimer() {
