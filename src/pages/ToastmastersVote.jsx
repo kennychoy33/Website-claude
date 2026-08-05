@@ -2467,6 +2467,11 @@ function agendaRoleSummary(role, people, data, lang = 'zh') {
     .find(item => item.name && item.name === person)
   const normalized = normalizeAgendaText(roleName)
   const en = lang !== 'zh'
+  if (roleKey.startsWith('prepared-') || /prepared speaker/i.test(roleName)) {
+    const title = speaker?.title?.trim()
+    if (title) return en ? `Title: ${title}` : `题目：${title}`
+    return displayName
+  }
   if (/toastmaster of the evening/i.test(roleName)) return en ? 'Introduce the meeting program' : '司仪介绍节目流程'
   if (/sergeant/i.test(roleName)) return en ? 'Sergeant at Arms welcome' : '礼宾司致欢迎词'
   if (/president/i.test(roleName)) return en ? 'President opening address' : '会长致开会词'
@@ -3468,10 +3473,10 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
             </div>
             <table className="tm-agenda-table">
               <colgroup>
-                <col style={{ width: '12.5%' }} />
-                <col style={{ width: '38%' }} />
-                <col style={{ width: '22%' }} />
-                <col style={{ width: '9.5%' }} />
+                <col style={{ width: '11.5%' }} />
+                <col style={{ width: '42%' }} />
+                <col style={{ width: '20.5%' }} />
+                <col style={{ width: '8%' }} />
                 <col style={{ width: '18%' }} />
               </colgroup>
               <thead>

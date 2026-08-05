@@ -1993,12 +1993,28 @@
   white-space: nowrap;
 }
 
+.tm-agenda-print.pdf-export .tm-agenda-table {
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+  table-layout: fixed !important;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-table th,
 .tm-agenda-print.pdf-export .tm-agenda-table td {
-  font-size: 10.8pt;
-  line-height: 1.08;
-  padding: 0.72mm 1.4mm;
-  min-height: 5.2mm;
-  overflow-wrap: anywhere;
+  box-sizing: border-box;
+  height: auto !important;
+  min-height: 0;
+  border: .3mm solid #050505 !important;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-table td {
+  font-size: 10.2pt;
+  line-height: 1.16;
+  padding: 0.62mm 1.15mm;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-table .time {
@@ -2006,6 +2022,9 @@
   letter-spacing: 0;
   padding-left: .6mm;
   padding-right: .6mm;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-table .duration {
@@ -2013,10 +2032,14 @@
   padding-left: .5mm;
   padding-right: .5mm;
   white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-table .person {
-  font-size: 10.6pt;
+  font-size: 10.2pt;
+  line-height: 1.12;
+  overflow-wrap: break-word;
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-table tr.section td {
