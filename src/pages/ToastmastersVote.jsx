@@ -2555,7 +2555,6 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh', options = {
     .filter(Boolean)
     .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), agendaRoleSummary(role, people, data, lang), role.time || '2', canonicalAgendaRoleKey(role.roleName), role, '8:37PM'))
   const timerRole = byKey.get('timer')
-  const registrationRole = byKey.get('registration')
   const toastmasterRole = byKey.get('toastmaster')
   const presidentRole = byKey.get('president')
   const technicalRole = byKey.get('technical')
@@ -2650,7 +2649,7 @@ function roleCategory(roleName = '') {
   const key = canonicalAgendaRoleKey(roleName)
   const normalized = normalizeAgendaText(roleName)
   if (key.startsWith('prepared-') || /prepared speaker/i.test(roleName) || normalized.includes('\u5907\u7a3f\u8bb2\u5458') || normalized.includes('\u5907\u7a3f')) return 'prepared'
-  if (key.startsWith('topics-') || /table topics speaker/i.test(roleName) || normalized.includes('\u5373\u5e2d\u8bb2\u5458')) return 'impromptu'
+  if (/^topics-\d+$/.test(key) || /table topics speaker/i.test(roleName) || normalized.includes('\u5373\u5e2d\u8bb2\u5458')) return 'impromptu'
   if (key.startsWith('evaluator-') || /^evaluator\b/i.test(roleName) || normalized.includes('\u8bc4\u8bba') || normalized.includes('\u8bc4\u4f30\u5458') || normalized.includes('\u8bb2\u8bc4')) return 'evaluator'
   return ''
 }
