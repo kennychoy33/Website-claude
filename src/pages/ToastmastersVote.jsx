@@ -1525,9 +1525,58 @@ function timerLight(elapsedSeconds, targets) {
   return { key: 'idle', label: 'Ready', text: '准备' }
 }
 
+function hasAssignedMeetingRoles(roles = [], people = { members: [], guests: [] }) {
+  return roles.some(role => personLabel(people, role.personType, role.personId))
+}
+
+function timerFallbackFromCandidates(data, people, lang = 'zh') {
+  const candidateMembers = []
+  const memberByName = new Map((people.members || []).map(item => [normalizeAgendaText(item.name), item]))
+  const guestByName = new Map((people.guests || []).map(item => [normalizeAgendaText(item.name), item]))
+  const ensurePerson = (name = '') => {
+    const normalized = normalizeAgendaText(name)
+    if (!normalized) return { personType: 'member', personId: '' }
+    const member = memberByName.get(normalized)
+    if (member) return { personType: 'member', personId: member.id }
+    const guest = guestByName.get(normalized)
+    if (guest) return { personType: 'guest', personId: guest.id }
+    const synthetic = { id: `timer-candidate-${candidateMembers.length}`, name }
+    candidateMembers.push(synthetic)
+    return { personType: 'member', personId: synthetic.id }
+  }
+  const roleName = (zh, en) => (lang === 'en' ? en : zh)
+  const roles = [
+    ...(data.prepared || []).filter(item => item.name).map((item, index) => ({
+      id: `timer-prepared-${index}`,
+      roleName: roleName(`备稿讲员 ${index + 1}`, `Prepared Speaker ${index + 1}`),
+      time: '7',
+      ...ensurePerson(item.name),
+    })),
+    ...(data.impromptu || []).filter(item => item.name).map((item, index) => ({
+      id: `timer-impromptu-${index}`,
+      roleName: roleName(`即席讲员 ${index + 1}`, `Table Topics Speaker ${index + 1}`),
+      time: '2',
+      ...ensurePerson(item.name),
+    })),
+    ...(data.evaluator || []).filter(item => item.name).map((item, index) => ({
+      id: `timer-evaluator-${index}`,
+      roleName: roleName(`评论员 ${index + 1}`, `Evaluator ${index + 1}`),
+      time: '3',
+      ...ensurePerson(item.name),
+    })),
+  ]
+  return {
+    people: { ...people, members: [...(people.members || []), ...candidateMembers] },
+    meetingOps: { attendance: [], roles },
+  }
+}
+
 function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId = 'default', publicTimer = false, timerLink = '' }) {
   const uiLang = t.langLabel === 'Language' ? 'en' : 'zh'
-  const agendaRows = standardAgendaScheduleRows(agendaRowsFromTemplate(settings, meetingOps.roles), people, data, uiLang)
+  const timerSource = publicTimer && !hasAssignedMeetingRoles(meetingOps.roles, people)
+    ? timerFallbackFromCandidates(data, people, uiLang)
+    : { people, meetingOps }
+  const agendaRows = standardAgendaScheduleRows(agendaRowsFromTemplate(settings, timerSource.meetingOps.roles), timerSource.people, data, uiLang)
   const flowItems = agendaRows.filter(item => !item.section)
   const firstId = flowItems[0]?.id || ''
   const [activeId, setActiveId] = useState(firstId)
@@ -2476,6 +2525,10 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh') {
     .map(key => byKey.get(key))
     .filter(Boolean)
     .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), agendaRoleSummary(role, people, data, lang), '2-3', canonicalAgendaRoleKey(role.roleName), role, evaluatorTimes[index] || '9:08PM'))
+  const topicsRows = ['topics-1', 'topics-2', 'topics-3', 'topics-4']
+    .map(key => byKey.get(key))
+    .filter(Boolean)
+    .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), agendaRoleSummary(role, people, data, lang), role.time || '2', canonicalAgendaRoleKey(role.roleName), role, '8:37PM'))
   const timerRole = byKey.get('timer')
   const toastmasterRole = byKey.get('toastmaster')
   const presidentRole = byKey.get('president')
@@ -2493,6 +2546,7 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh') {
     ...preparedRows,
     rowFor('timer-report-1', text('计时报告', 'Timer Report'), '1', 'timer', timerRole, '8:34PM'),
     rowFor('topics-master', text('即席主持', 'Table Topics Session'), '15', 'topics-master', null, '8:35PM'),
+    ...topicsRows,
     rowFor('timer-report-2', text('计时报告', 'Timer Report'), '1', 'timer', timerRole, '8:50PM'),
     rowFor('photo', text('大合照', 'Group Photo'), '1', 'president', presidentRole, '8:51PM'),
     rowFor('break', text('交流时间', 'Networking Break'), '8', 'toastmaster', toastmasterRole, '8:52PM'),
