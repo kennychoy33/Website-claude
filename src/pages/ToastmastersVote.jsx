@@ -2508,7 +2508,7 @@ function agendaScheduleRows(rows, people, data, lang = 'zh') {
   })
 }
 
-function standardAgendaScheduleRows(rows, people, data, lang = 'zh') {
+function standardAgendaScheduleRows(rows, people, data, lang = 'zh', options = {}) {
   const en = lang !== 'zh'
   const text = (zh, english) => lang === 'bi' ? `${zh} / ${english}` : (en ? english : zh)
   const byKey = new Map(rows.map(role => [canonicalAgendaRoleKey(role.roleName), role]))
@@ -2556,7 +2556,7 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh') {
     ...preparedRows,
     rowFor('timer-report-1', text('计时报告', 'Timer Report'), '1', 'timer', timerRole, '8:34PM'),
     rowFor('topics-master', text('即席主持', 'Table Topics Session'), '15', 'topics-master', null, '8:35PM'),
-    ...topicsRows,
+    ...(options.compactPrint ? [] : topicsRows),
     rowFor('timer-report-2', text('计时报告', 'Timer Report'), '1', 'timer', timerRole, '8:50PM'),
     rowFor('photo', text('大合照', 'Group Photo'), '1', 'president', presidentRole, '8:51PM'),
     rowFor('break', text('交流时间', 'Networking Break'), '8', 'toastmaster', toastmasterRole, '8:52PM'),
@@ -3128,7 +3128,7 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
 
   const agendaPrintRows = agendaRowsFromTemplate(settings, meetingOps.roles)
   const agendaLang = settings.agendaLanguage === 'auto' || !settings.agendaLanguage ? uiLang : settings.agendaLanguage
-  const agendaSchedule = standardAgendaScheduleRows(agendaPrintRows, people, data, agendaLang)
+  const agendaSchedule = standardAgendaScheduleRows(agendaPrintRows, people, data, agendaLang, { compactPrint: true })
   const agendaText = agendaLang === 'bi'
     ? {
         motto: '中爱吾会， 化雨春风， 齐展翅 / Where Leaders Are Made',

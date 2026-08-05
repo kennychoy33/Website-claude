@@ -1957,22 +1957,25 @@
 
 .tm-agenda-print.pdf-export .tm-agenda-title-bar {
   grid-template-columns: 1fr 52mm;
-  padding: 2.4mm 5mm;
+  padding: 1.6mm 5mm;
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-title-bar strong,
 .tm-agenda-print.pdf-export .tm-agenda-title-bar span {
-  font-size: 28pt;
+  font-size: 25pt;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-topic-row {
   grid-template-columns: 1fr 37mm 29mm;
-  min-height: 29mm;
+  min-height: 25mm;
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-topic-row p {
-  font-size: 21.5pt;
-  margin: 2mm 3mm;
+  font-size: 19.5pt;
+  line-height: 1.1;
+  margin: 1.5mm 3mm;
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-qr-note {
@@ -1987,9 +1990,9 @@
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-table th {
-  font-size: 13.2pt;
-  line-height: 1.05;
-  padding: 1.45mm 1mm;
+  font-size: 12.4pt;
+  line-height: 1.08;
+  padding: 1.15mm 1mm;
   white-space: nowrap;
 }
 
@@ -2008,9 +2011,9 @@
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-table td {
-  font-size: 10.2pt;
-  line-height: 1.16;
-  padding: 0.62mm 1.15mm;
+  font-size: 10pt;
+  line-height: 1.24;
+  padding: 0.82mm 1.15mm;
   white-space: normal;
   overflow: visible;
   overflow-wrap: break-word;
@@ -2037,15 +2040,15 @@
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-table .person {
-  font-size: 10.2pt;
-  line-height: 1.12;
+  font-size: 9.8pt;
+  line-height: 1.18;
   overflow-wrap: break-word;
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-table tr.section td {
-  font-size: 11.8pt;
-  line-height: 1.05;
-  padding: .75mm 1.4mm;
+  font-size: 11.2pt;
+  line-height: 1.08;
+  padding: .65mm 1.4mm;
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-mini-summary {
