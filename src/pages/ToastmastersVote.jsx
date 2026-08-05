@@ -59,6 +59,22 @@ function getSettingsUrl() {
   return new URL(`${basePath.replace(/\/$/, '')}/tm-vote`, window.location.origin).toString()
 }
 
+async function copyText(value = '') {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value)
+    return
+  }
+  const textarea = document.createElement('textarea')
+  textarea.value = value
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  document.execCommand('copy')
+  document.body.removeChild(textarea)
+}
+
 const SUPER_ADMIN_EMAILS = ['kenny@smartouch.com.my']
 
 function isSuperAdmin(user) {
@@ -119,6 +135,8 @@ const LANG = {
     voteLink: '投票链接',
     timerLink: '计时员链接',
     copyTimerLink: '复制计时员链接',
+    copied: '已复制',
+    saveNow: '保存中...',
     scanVote: '扫码投票',
     copyLink: '复制链接',
     downloadPoster: '下载分享图片',
@@ -323,6 +341,8 @@ const LANG = {
     voteLink: 'Voting Link',
     timerLink: 'Timer Link',
     copyTimerLink: 'Copy Timer Link',
+    copied: 'Copied',
+    saveNow: 'Saving...',
     scanVote: 'Scan to Vote',
     copyLink: 'Copy Link',
     downloadPoster: 'Download Share Image',
@@ -702,6 +722,7 @@ function CandidateEditor({ type, candidates, onChange, t, people, meetingRoles =
 function AdminView({ data, setData, setView, persistState, source, syncStatus, t, people, meetingOps, spaceId, voteLink }) {
   const cloudReady = isCloudConfigured && source === 'cloud' && spaceId && !spaceId.startsWith('local-')
   const isVotingOpen = ['open', '开放投票', '开放中'].includes(data.meeting.status)
+  const [actionStatus, setActionStatus] = useState('')
 
   function updateMeeting(field, value) {
     if (isVotingOpen) return
@@ -733,7 +754,10 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
       },
     }
     setData(next)
-    persistState(next)
+    setActionStatus(t.saveNow)
+    Promise.resolve(persistState(next))
+      .then(() => setActionStatus(t.saved))
+      .catch(err => setActionStatus(err.message || t.saveFailed))
   }
 
   function setStatus(status) {
@@ -791,6 +815,7 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
           <div>
             <h1>{t.todaySetup} <span>{meetingStatusLabel(data.meeting.status, t)}</span></h1>
             <p>{data.meeting.number} {t.regularMeeting} | {data.meeting.theme}</p>
+            {actionStatus && <div className="tm-sync-badge"><b>{actionStatus}</b></div>}
             <SyncBadge source={source} syncStatus={syncStatus} t={t} />
           </div>
           <div className="tm-actions">
@@ -849,7 +874,7 @@ function AdminView({ data, setData, setView, persistState, source, syncStatus, t
             <p>{t.scanVote}</p>
             <QrBlock value={voteLink} />
             <strong>{voteLink}</strong>
-            <button onClick={() => navigator.clipboard?.writeText(voteLink)}>{t.copyLink}</button>
+            <button onClick={() => copyText(voteLink).then(() => setActionStatus(t.copied)).catch(err => setActionStatus(err.message || t.saveFailed))}>{actionStatus === t.copied ? t.copied : t.copyLink}</button>
             <button className="tm-outline" onClick={() => setView('share')}>{t.downloadPoster}</button>
           </>
         ) : (
@@ -1500,6 +1525,7 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
   const [records, setRecords] = useState([])
   const [timerStatus, setTimerStatus] = useState('')
   const [timerFocus, setTimerFocus] = useState(false)
+  const [copyStatus, setCopyStatus] = useState('')
   const activeItem = flowItems.find(item => item.id === activeId) || flowItems[0] || {}
   const activeTargets = timerTargets(activeItem)
   const elapsed = startedAt ? baseElapsed + ((now - startedAt) / 1000) : baseElapsed
@@ -1619,7 +1645,7 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
         </div>
         {!publicTimer && timerLink && (
           <div className="tm-actions">
-            <button onClick={() => navigator.clipboard?.writeText(timerLink)}>{t.copyTimerLink}</button>
+            <button onClick={() => copyText(timerLink).then(() => setCopyStatus(t.copied)).catch(err => setCopyStatus(err.message || t.saveFailed))}>{copyStatus || t.copyTimerLink}</button>
           </div>
         )}
       </div>
@@ -1753,6 +1779,7 @@ function HistoryView({ data, t }) {
 function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
   const [importOpen, setImportOpen] = useState(false)
   const [importText, setImportText] = useState('')
+  const [actionStatus, setActionStatus] = useState('')
 
   function updateMember(id, field, value) {
     setPeople({
@@ -1875,16 +1902,24 @@ function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
     setImportText('')
   }
 
+  function savePeopleWithFeedback() {
+    setActionStatus(t.saveNow)
+    Promise.resolve(persistPeople(people))
+      .then(() => setActionStatus(t.peopleSaved || t.saved))
+      .catch(err => setActionStatus(err.message || t.saveFailed))
+  }
+
   return (
     <div className="tm-main-column">
       <div className="tm-screen-head">
         <div>
           <h1>{t.navPeople}</h1>
           <p>{t.privateSpace}</p>
+          {actionStatus && <div className="tm-sync-badge"><b>{actionStatus}</b></div>}
           {syncStatus && <div className="tm-sync-badge"><b>{syncStatus}</b></div>}
         </div>
         <div className="tm-actions">
-          <button className="tm-gold" onClick={() => persistPeople(people)}>{t.save}</button>
+          <button className="tm-gold" onClick={savePeopleWithFeedback}>{actionStatus === t.saveNow ? t.saveNow : t.save}</button>
           <button onClick={() => setImportOpen(true)}>{t.importWhatsappList}</button>
           <button onClick={importChungHwaList}>{t.importChungHwaList}</button>
           <button onClick={addMember}>{t.addMember}</button>
