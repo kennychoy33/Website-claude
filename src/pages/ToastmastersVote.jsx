@@ -1571,7 +1571,7 @@ function timerFallbackFromCandidates(data, people, lang = 'zh') {
   }
 }
 
-function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId = 'default', publicTimer = false, timerLink = '' }) {
+function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId = 'default', publicTimer = false, timerLink = '', onCopyTimerLink = null }) {
   const uiLang = t.langLabel === 'Language' ? 'en' : 'zh'
   const timerSource = publicTimer && !hasAssignedMeetingRoles(meetingOps.roles, people)
     ? timerFallbackFromCandidates(data, people, uiLang)
@@ -1762,7 +1762,11 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
         </div>
         {!publicTimer && timerLink && (
           <div className="tm-actions">
-            <button onClick={() => copyText(timerLink).then(() => setCopyStatus(t.copied)).catch(err => setCopyStatus(err.message || t.saveFailed))}>{copyStatus || t.copyTimerLink}</button>
+            <button onClick={() => {
+              setCopyStatus(t.syncing)
+              const action = onCopyTimerLink ? onCopyTimerLink() : copyText(timerLink)
+              action.then(() => setCopyStatus(t.copied)).catch(err => setCopyStatus(err.message || t.saveFailed))
+            }}>{copyStatus || t.copyTimerLink}</button>
           </div>
         )}
       </div>
@@ -3851,6 +3855,17 @@ export default function ToastmastersVote() {
     }
   }
 
+  async function saveAndCopyTimerLink() {
+    if (!data) return
+    setSyncStatus(t.syncing)
+    const savedData = await persistState(data) || data
+    const activeMeetingId = savedData.meeting?.id || data.meeting?.id || ''
+    await persistMeetingOps(meetingOps, activeMeetingId)
+    const link = getPublicTimerUrl(workspaceId, selectedClubId, activeMeetingId)
+    await copyText(link)
+    setSyncStatus(t.copied)
+  }
+
   async function persistSettings(next) {
     if (!superAdmin) {
       setSyncStatus(t.saveFailed)
@@ -4008,7 +4023,7 @@ export default function ToastmastersVote() {
         {view === 'admin' && <AdminView data={data} setData={setData} setView={setView} persistState={persistState} source={source} syncStatus={syncStatus} t={appText} people={people} meetingOps={meetingOps} spaceId={workspaceId} voteLink={effectiveVoteLink} />}
         {view === 'people' && <PeopleView people={people} setPeople={setPeople} persistPeople={persistPeople} syncStatus={syncStatus} t={appText} />}
         {view === 'meeting' && <MeetingView data={data} setData={setData} persistState={persistState} people={people} setPeople={setPeople} persistPeople={persistPeople} meetingOps={meetingOps} setMeetingOps={setMeetingOps} persistMeetingOps={persistMeetingOps} syncStatus={syncStatus} t={appText} settings={settings} voteLink={effectiveVoteLink} />}
-        {view === 'timer' && <TimerView data={data} people={people} meetingOps={meetingOps} settings={settings} t={appText} spaceId={workspaceId} clubId={publicTimerView ? publicClub : selectedClubId} publicTimer={publicTimerView} timerLink={effectiveTimerLink} />}
+        {view === 'timer' && <TimerView data={data} people={people} meetingOps={meetingOps} settings={settings} t={appText} spaceId={workspaceId} clubId={publicTimerView ? publicClub : selectedClubId} publicTimer={publicTimerView} timerLink={effectiveTimerLink} onCopyTimerLink={saveAndCopyTimerLink} />}
         {view === 'vote' && <VoteView data={data} setData={setData} setView={setView} t={appText} spaceId={workspaceId} />}
         {view === 'success' && <div className="tm-success-card"><h1>{appText.thankVote}</h1><p>{appText.recorded}</p></div>}
         {view === 'share' && <SharePoster data={data} t={appText} voteLink={effectiveVoteLink} />}
