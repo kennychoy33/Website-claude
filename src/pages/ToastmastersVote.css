@@ -1987,19 +1987,42 @@
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-table th {
-  font-size: 14.6pt;
-  padding: 1.8mm 1mm;
+  font-size: 13.2pt;
+  line-height: 1.05;
+  padding: 1.45mm 1mm;
+  white-space: nowrap;
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-table td {
-  font-size: 11.6pt;
-  line-height: 1.12;
-  padding: 0.95mm 2mm;
+  font-size: 10.8pt;
+  line-height: 1.08;
+  padding: 0.72mm 1.4mm;
+  min-height: 5.2mm;
+  overflow-wrap: anywhere;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-table .time {
+  font-size: 10.4pt;
+  letter-spacing: 0;
+  padding-left: .6mm;
+  padding-right: .6mm;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-table .duration {
+  font-size: 10.4pt;
+  padding-left: .5mm;
+  padding-right: .5mm;
+  white-space: nowrap;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-table .person {
+  font-size: 10.6pt;
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-table tr.section td {
-  font-size: 12.8pt;
-  padding: 1mm 2mm;
+  font-size: 11.8pt;
+  line-height: 1.05;
+  padding: .75mm 1.4mm;
 }
 
 .tm-agenda-print.pdf-export .tm-agenda-mini-summary {

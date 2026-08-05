@@ -2617,6 +2617,13 @@ function findPersonInText(text, people) {
     })
 }
 
+function splitAgendaNames(value = '') {
+  return cleanAgendaValue(value)
+    .split(/\s*(?:\/|、|，|,|\+|和|及)\s*/g)
+    .map(name => name.replace(/\s*(TC|DTM|LD|L)\d*$/i, '').trim())
+    .filter(Boolean)
+}
+
 function roleCategory(roleName = '') {
   const key = canonicalAgendaRoleKey(roleName)
   const normalized = normalizeAgendaText(roleName)
@@ -2673,7 +2680,13 @@ function personFromAgendaValue(value = '', people) {
     .replace(/\s*(TC|DTM|LD|L)\d*$/i, '')
     .trim()
   if (!cleaned) return null
-  return findPersonInText(cleaned, people) || findExistingPersonByName(cleaned, people)
+  const direct = findPersonInText(cleaned, people) || findExistingPersonByName(cleaned, people)
+  if (direct) return direct
+  for (const name of splitAgendaNames(value)) {
+    const person = findPersonInText(name, people) || findExistingPersonByName(name, people)
+    if (person) return person
+  }
+  return null
 }
 
 function extractAgendaValue(lines, patterns) {
@@ -2765,7 +2778,7 @@ function ensureAgendaPeople(text, people) {
     .map(name => cleanAgendaValue(name).replace(/[,，].*$/, '').replace(/\s*(TC|DTM|LD|L)\d*$/i, '').trim())
     .filter(Boolean)
   const nextGuests = [...people.guests]
-  names.forEach(name => {
+  names.flatMap(name => splitAgendaNames(name)).forEach(name => {
     if (findExistingPersonByName(name, { ...people, guests: nextGuests })) return
     nextGuests.push({
       id: `g${Date.now()}${nextGuests.length}`,
@@ -3455,10 +3468,10 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
             </div>
             <table className="tm-agenda-table">
               <colgroup>
-                <col style={{ width: '10.5%' }} />
+                <col style={{ width: '12.5%' }} />
                 <col style={{ width: '38%' }} />
-                <col style={{ width: '23%' }} />
-                <col style={{ width: '10.5%' }} />
+                <col style={{ width: '22%' }} />
+                <col style={{ width: '9.5%' }} />
                 <col style={{ width: '18%' }} />
               </colgroup>
               <thead>
