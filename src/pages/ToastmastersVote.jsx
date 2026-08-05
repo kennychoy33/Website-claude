@@ -2352,13 +2352,14 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh') {
   const byKey = new Map(rows.map(role => [canonicalAgendaRoleKey(role.roleName), role]))
   const rowFor = (key, summary, duration, personKey = key, source = null, time = '') => {
     const role = source || byKey.get(personKey) || byKey.get(key) || {}
+    const actualDuration = role.time || duration
     return {
       id: `${key}-${summary}`,
       roleName: role.roleName || key,
       time,
       summary,
       person: personLabel(people, role.personType, role.personId),
-      duration,
+      duration: actualDuration,
     }
   }
   const preparedTimes = ['8:10PM', '8:18PM', '8:26PM']
@@ -2404,9 +2405,12 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh') {
     rowFor('exco-report', text('执委及事项报告', 'EXCO / Announcements'), '3', 'toastmaster', toastmasterRole, '9:50PM'),
     rowFor('president-closing', text('会长致休会词', 'President closing address'), '3-5', 'president', presidentRole, '9:53PM'),
   ]
+  let current = 19 * 60 + 15
   return flow.map((item, index) => {
     if (item.section) return { id: `section-${index}`, section: item.section }
-    return item
+    const next = { ...item, time: formatAgendaTime(current) }
+    current += minutesFromRoleTime(item.duration)
+    return next
   })
 }
 
