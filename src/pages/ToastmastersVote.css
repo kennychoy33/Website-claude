@@ -1898,6 +1898,114 @@
   margin-bottom: 4px;
 }
 
+.tm-agenda-print.pdf-export {
+  width: 210mm !important;
+  height: 297mm !important;
+  padding: 5mm 7mm 4mm !important;
+  font-size: 10.4pt;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-motto {
+  font-size: 10.8pt;
+  letter-spacing: 5mm;
+  margin: 0 0 2mm 5mm;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-frame {
+  border-width: .8mm;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-template-head {
+  grid-template-columns: 27mm 1fr 27mm;
+  gap: 2mm;
+  padding: 2.2mm 4mm 1.5mm;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-template-head h1 {
+  font-size: 20pt;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-template-head p {
+  font-size: 10pt;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-template-head h3 {
+  font-size: 13pt;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-logo {
+  max-width: 22mm;
+  max-height: 22mm;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-logo-box {
+  min-height: 21mm;
+  font-size: 8pt;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-purpose {
+  padding: 1.2mm 2.2mm;
+  font-size: 10.8pt;
+  line-height: 1.16;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-purpose b {
+  font-size: 11pt;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-title-bar {
+  grid-template-columns: 1fr 52mm;
+  padding: 2.4mm 5mm;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-title-bar strong,
+.tm-agenda-print.pdf-export .tm-agenda-title-bar span {
+  font-size: 28pt;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-topic-row {
+  grid-template-columns: 1fr 37mm 29mm;
+  min-height: 29mm;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-topic-row p {
+  font-size: 21.5pt;
+  margin: 2mm 3mm;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-qr-note {
+  font-size: 12pt;
+  padding: 4mm 2mm;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-qr .tm-qr,
+.tm-agenda-print.pdf-export .tm-agenda-qr .tm-qr img {
+  width: 26mm;
+  height: 26mm;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-table th {
+  font-size: 14.6pt;
+  padding: 1.8mm 1mm;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-table td {
+  font-size: 11.6pt;
+  line-height: 1.12;
+  padding: 0.95mm 2mm;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-table tr.section td {
+  font-size: 12.8pt;
+  padding: 1mm 2mm;
+}
+
+.tm-agenda-print.pdf-export .tm-agenda-mini-summary {
+  display: none;
+}
+
 @media (max-width: 980px) {
   .tm-page {
     grid-template-columns: 1fr;

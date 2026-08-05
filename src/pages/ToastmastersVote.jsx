@@ -2543,6 +2543,15 @@ function cleanAgendaValue(value = '') {
     .trim()
 }
 
+function personFromAgendaValue(value = '', people) {
+  const cleaned = cleanAgendaValue(value)
+    .replace(/[,ï¼Œ].*$/, '')
+    .replace(/\s*(TC|DTM|LD|L)\d*$/i, '')
+    .trim()
+  if (!cleaned) return null
+  return findPersonInText(cleaned, people) || findExistingPersonByName(cleaned, people)
+}
+
 function extractAgendaValue(lines, patterns) {
   for (const line of lines) {
     for (const pattern of patterns) {
@@ -2625,6 +2634,7 @@ function ensureAgendaPeople(text, people) {
     /尾音计算员\s*[：:]\s*(.+)$/,
     /计时员\s*[：:]\s*(.+)$/,
     /技术经理\s*[：:]\s*(.+)$/,
+    /技术经理\s*(?:是|为)?\s*[：:]?\s*(.+)$/,
     /总评论\s*[：:]\s*(.+)$/,
   ]
   const names = lines.flatMap(line => namePatterns.map(pattern => line.match(pattern)?.[1]).filter(Boolean))
@@ -2667,14 +2677,14 @@ function importAgendaTextToRoles(text, roles, people) {
     { key: 'grammarian', patterns: [/语言评论员\s*[：:]\s*(.+)$/] },
     { key: 'ah-counter', patterns: [/尾音计算员\s*[：:]\s*(.+)$/] },
     { key: 'timer', patterns: [/计时员\s*[：:]\s*(.+)$/] },
-    { key: 'technical', patterns: [/技术经理\s*[：:]\s*(.+)$/] },
+    { key: 'technical', patterns: [/技术经理\s*[：:]\s*(.+)$/, /技术经理\s*(?:是|为)?\s*[：:]?\s*(.+)$/] },
     { key: 'general-evaluator', patterns: [/总评论\s*[：:]\s*(.+)$/] },
   ]
   const personForKey = new Map()
   directAssignments.forEach(item => {
     const value = extractAgendaValue(lines, item.patterns)
     if (!value) return
-    const person = findPersonInText(value, people) || findExistingPersonByName(cleanAgendaValue(value), people)
+    const person = personFromAgendaValue(value, people)
     if (person) personForKey.set(item.key, person)
   })
   const existingKeys = new Set(roles.map(role => canonicalAgendaRoleKey(role.roleName)))
@@ -3083,6 +3093,7 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
     clone.style.boxShadow = 'none'
     clone.style.borderRadius = '0'
     wrapper.appendChild(clone)
+    clone.classList.add('pdf-export')
     document.body.appendChild(wrapper)
     try {
       await document.fonts?.ready
