@@ -779,31 +779,31 @@ export async function saveMeetingOpsState(state, meetingId = '') {
   return { source: 'cloud' }
 }
 
-function localTimerKey(meetingId = '') {
-  return `${TM_VOTE_STORAGE_KEY}-timer-records-${meetingId || 'current'}`
+function localTimerKey(meetingId = '', spaceId = '', clubId = getActiveClubId()) {
+  return `${TM_VOTE_STORAGE_KEY}-timer-records-${spaceId || 'local'}-${clubId || 'default'}-${meetingId || 'current'}`
 }
 
-function loadLocalTimerRecords(meetingId = '') {
+function loadLocalTimerRecords(meetingId = '', spaceId = '', clubId = getActiveClubId()) {
   try {
-    return JSON.parse(localStorage.getItem(localTimerKey(meetingId)) || '[]')
+    return JSON.parse(localStorage.getItem(localTimerKey(meetingId, spaceId, clubId)) || '[]')
   } catch {
     return []
   }
 }
 
-function saveLocalTimerRecords(meetingId = '', records = []) {
-  localStorage.setItem(localTimerKey(meetingId), JSON.stringify(records))
+function saveLocalTimerRecords(meetingId = '', records = [], spaceId = '', clubId = getActiveClubId()) {
+  localStorage.setItem(localTimerKey(meetingId, spaceId, clubId), JSON.stringify(records))
 }
 
 export async function loadTimerRecordsState(meetingId = '', spaceId = '', clubId = getActiveClubId()) {
   if (!isCloudConfigured) {
-    return { data: loadLocalTimerRecords(meetingId), source: 'local' }
+    return { data: loadLocalTimerRecords(meetingId, spaceId, clubId), source: 'local' }
   }
 
   const user = await getCurrentUser()
   const activeOwner = spaceId || user?.id
   if (!activeOwner || !meetingId) {
-    return { data: loadLocalTimerRecords(meetingId), source: 'local' }
+    return { data: loadLocalTimerRecords(meetingId, spaceId, clubId), source: 'local' }
   }
 
   const readClient = spaceId && !user ? (publicSupabase || supabase) : supabase
@@ -816,7 +816,7 @@ export async function loadTimerRecordsState(meetingId = '', spaceId = '', clubId
     .order('created_at', { ascending: false })
 
   if (isMissingSchemaError(error)) {
-    return { data: loadLocalTimerRecords(meetingId), source: 'local' }
+    return { data: loadLocalTimerRecords(meetingId, spaceId, clubId), source: 'local' }
   }
   if (error) throw error
 
@@ -824,8 +824,8 @@ export async function loadTimerRecordsState(meetingId = '', spaceId = '', clubId
 }
 
 export async function saveTimerRecordState(record, meetingId = '', spaceId = '', clubId = getActiveClubId()) {
-  const nextLocal = [record, ...loadLocalTimerRecords(meetingId).filter(item => item.id !== record.id)].slice(0, 120)
-  saveLocalTimerRecords(meetingId, nextLocal)
+  const nextLocal = [record, ...loadLocalTimerRecords(meetingId, spaceId, clubId).filter(item => item.id !== record.id)].slice(0, 120)
+  saveLocalTimerRecords(meetingId, nextLocal, spaceId, clubId)
 
   if (!isCloudConfigured) {
     return { data: nextLocal, source: 'local' }

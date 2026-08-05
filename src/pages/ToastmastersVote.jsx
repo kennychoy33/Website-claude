@@ -1470,8 +1470,9 @@ function Bar({ item, max }) {
   )
 }
 
-function timerRecordKey(meetingId) {
-  return `tm-timer-records-${meetingId || 'current'}`
+function timerRecordKey(meetingId, spaceId = '', clubId = 'default') {
+  const scope = [spaceId || 'local', clubId || 'default', meetingId || 'current'].join('__')
+  return `tm-timer-records-${scope}`
 }
 
 function parseTimerMinutes(value = '', fallback = 3) {
@@ -1531,6 +1532,8 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
   const elapsed = startedAt ? baseElapsed + ((now - startedAt) / 1000) : baseElapsed
   const light = timerLight(elapsed, activeTargets)
   const progress = Math.min(100, (elapsed / Math.max(1, activeTargets.red * 60)) * 100)
+  const timerMeetingId = data.meeting?.id || getVoteInstanceKey(data, spaceId)
+  const timerStorageKey = timerRecordKey(timerMeetingId, spaceId, clubId)
 
   useEffect(() => {
     if (!activeId && firstId) setActiveId(firstId)
@@ -1546,12 +1549,12 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
     let ignore = false
     async function hydrateTimerRecords() {
       try {
-        const result = await loadTimerRecordsState(data.meeting?.id, publicTimer ? spaceId : '', clubId)
+        const result = await loadTimerRecordsState(timerMeetingId, spaceId, clubId)
         if (!ignore) setRecords(result.data || [])
       } catch {
         if (!ignore) {
           try {
-            setRecords(JSON.parse(localStorage.getItem(timerRecordKey(data.meeting?.id)) || '[]'))
+            setRecords(JSON.parse(localStorage.getItem(timerStorageKey) || '[]'))
           } catch {
             setRecords([])
           }
@@ -1563,7 +1566,7 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
     setBaseElapsed(0)
     setStartedAt(null)
     return () => { ignore = true }
-  }, [data.meeting?.id, firstId, publicTimer, spaceId, clubId])
+  }, [timerMeetingId, timerStorageKey, firstId, spaceId, clubId])
 
   function selectItem(id) {
     setActiveId(id)
@@ -1610,10 +1613,10 @@ function TimerView({ data, people, meetingOps, settings, t, spaceId = '', clubId
     }
     const optimistic = [record, ...records].slice(0, 80)
     setRecords(optimistic)
-    localStorage.setItem(timerRecordKey(data.meeting?.id), JSON.stringify(optimistic))
+    localStorage.setItem(timerStorageKey, JSON.stringify(optimistic))
     setTimerStatus('Saving...')
     try {
-      const result = await saveTimerRecordState(record, data.meeting?.id, publicTimer ? spaceId : '', clubId)
+      const result = await saveTimerRecordState(record, timerMeetingId, spaceId, clubId)
       setRecords(result.data || optimistic)
       setTimerStatus(result.source === 'cloud' ? 'Saved' : 'Saved on this device')
     } catch (err) {
