@@ -2346,6 +2346,7 @@ function agendaRowsFromTemplate(settings, roles = []) {
 function canonicalAgendaRoleKey(roleName = '') {
   const text = normalizeAgendaText(roleName)
   if (!text) return ''
+  if (text.includes('registration') || text.includes('networking') || text.includes('登记') || text.includes('交流')) return 'registration'
   if (text.includes('table topics evaluation') || text.includes('table topics evaluator') || text.includes('即席评论员') || text.includes('即席评论')) return 'topics-evaluator'
   if (text.includes('sergeant') || text.includes('礼宾司')) return 'sergeant'
   if (text.includes('president') || text.includes('会长')) return 'president'
@@ -2522,8 +2523,10 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh', options = {
   const text = (zh, english) => lang === 'bi' ? `${zh} / ${english}` : (en ? english : zh)
   const byKey = new Map(rows.map(role => [canonicalAgendaRoleKey(role.roleName), role]))
   const rowFor = (key, summary, duration, personKey = key, source = null, time = '') => {
-    const role = source || byKey.get(personKey) || byKey.get(key) || {}
-    const actualDuration = role.time || duration
+    const role = key === 'registration'
+      ? (byKey.get('registration') || source || byKey.get(personKey) || {})
+      : (source || byKey.get(personKey) || byKey.get(key) || {})
+    const actualDuration = key === 'registration' ? (role.time || '5') : (role.time || duration)
     return {
       id: `${key}-${summary}`,
       roleName: role.roleName || key,
@@ -2552,6 +2555,7 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh', options = {
     .filter(Boolean)
     .map((role, index) => rowFor(canonicalAgendaRoleKey(role.roleName), agendaRoleSummary(role, people, data, lang), role.time || '2', canonicalAgendaRoleKey(role.roleName), role, '8:37PM'))
   const timerRole = byKey.get('timer')
+  const registrationRole = byKey.get('registration')
   const toastmasterRole = byKey.get('toastmaster')
   const presidentRole = byKey.get('president')
   const technicalRole = byKey.get('technical')

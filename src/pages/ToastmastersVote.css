@@ -1718,7 +1718,7 @@
 }
 
 .tm-agenda-purpose {
-  display: block !important;
+  display: none !important;
   grid-template-columns: none !important;
   padding: 6px 9px;
   border-bottom: 1.5px solid #050505;
