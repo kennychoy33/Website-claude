@@ -1823,17 +1823,17 @@
 .tm-agenda-table th {
   background: #9bb7d7;
   color: #050505;
-  font-size: 18px;
-  padding: 7px 4px;
+  font-size: 19px;
+  padding: 6px 4px;
   border-right: 1.5px solid #050505;
   border-bottom: 1.5px solid #050505;
   font-weight: 900;
 }
 
 .tm-agenda-table td {
-  font-size: 14px;
-  line-height: 1.22;
-  padding: 4px 8px;
+  font-size: 15.5px;
+  line-height: 1.18;
+  padding: 3.5px 8px;
   border-right: 1.2px solid #050505;
   border-bottom: 1.2px solid #050505;
   vertical-align: middle;
@@ -1868,15 +1868,11 @@
   color: #050505;
   font-weight: 900;
   text-align: left;
-  font-size: 16px;
+  font-size: 17px;
 }
 
 .tm-agenda-footer {
-  text-align: center;
-  margin-top: 6px;
-  color: #7b8794;
-  font-size: 9px;
-  font-weight: 800;
+  display: none;
 }
 
 .tm-agenda-mini-summary {
@@ -2102,8 +2098,8 @@
     border: 0;
     border-radius: 0;
     box-shadow: none;
-    padding: 7mm 8mm 6mm;
-    font-size: 9.6pt;
+    padding: 5mm 7mm 4mm;
+    font-size: 10.4pt;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
@@ -2118,9 +2114,9 @@
   }
 
   .tm-agenda-motto {
-    font-size: 10.5pt;
+    font-size: 10.8pt;
     letter-spacing: 5mm;
-    margin: 0 0 3mm 5mm;
+    margin: 0 0 2mm 5mm;
   }
 
   .tm-agenda-frame {
@@ -2163,9 +2159,9 @@
   .tm-agenda-purpose {
     display: block !important;
     grid-template-columns: none !important;
-    padding: 1.5mm 2.2mm;
-    font-size: 10.4pt;
-    line-height: 1.22;
+    padding: 1.2mm 2.2mm;
+    font-size: 10.8pt;
+    line-height: 1.16;
   }
 
   .tm-agenda-purpose div {
@@ -2181,7 +2177,7 @@
 
   .tm-agenda-title-bar {
     grid-template-columns: 1fr 52mm;
-    padding: 3mm 5mm;
+    padding: 2.4mm 5mm;
   }
 
   .tm-agenda-title-bar strong,
@@ -2191,11 +2187,11 @@
 
   .tm-agenda-topic-row {
     grid-template-columns: 1fr 37mm 29mm;
-    min-height: 33mm;
+    min-height: 29mm;
   }
 
   .tm-agenda-topic-row p {
-    font-size: 21pt;
+    font-size: 21.5pt;
     margin: 2mm 3mm;
   }
 
@@ -2211,18 +2207,19 @@
   }
 
   .tm-agenda-table th {
-    font-size: 14pt;
-    padding: 2.2mm 1mm;
+    font-size: 14.6pt;
+    padding: 1.8mm 1mm;
   }
 
   .tm-agenda-table td {
-    font-size: 10.5pt;
-    padding: 1.25mm 2mm;
+    font-size: 11.6pt;
+    line-height: 1.12;
+    padding: 0.95mm 2mm;
   }
 
   .tm-agenda-table tr.section td {
-    font-size: 12pt;
-    padding: 1.4mm 2mm;
+    font-size: 12.8pt;
+    padding: 1mm 2mm;
   }
 
   .tm-agenda-footer {
@@ -2231,13 +2228,7 @@
   }
 
   .tm-agenda-mini-summary {
-    gap: 2mm;
-    margin-top: 2mm;
-  }
-
-  .tm-agenda-mini-summary div {
-    font-size: 7.2px;
-    padding: 1.6mm;
+    display: none;
   }
 
   .no-print {
