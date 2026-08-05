@@ -2311,7 +2311,8 @@ function agendaRowsFromTemplate(settings, roles = []) {
     .filter(Boolean)
     .map(role => (typeof role === 'string' ? { roleName: role, time: '' } : role))
     .filter(role => !nonRolePattern.test(role.roleName || ''))
-  const source = template.length ? template : roles
+  const usingTemplate = template.length > 0
+  const source = usingTemplate ? template : roles
   const seen = new Set()
   return source
     .map((role, index) => ({ role: typeof role === 'string' ? { roleName: role, time: '' } : role, index }))
@@ -2323,7 +2324,7 @@ function agendaRowsFromTemplate(settings, roles = []) {
     })
     .sort((a, b) => agendaRoleOrder(a.role.roleName) - agendaRoleOrder(b.role.roleName) || a.index - b.index)
     .map(({ role: templateRole }, index) => {
-    const assignedRole = roleMap.get(canonicalAgendaRoleKey(templateRole.roleName)) || roles[index] || {}
+    const assignedRole = roleMap.get(canonicalAgendaRoleKey(templateRole.roleName)) || (usingTemplate ? {} : roles[index]) || {}
     return {
       id: assignedRole.id || `${templateRole.roleName}-${index}`,
       roleName: templateRole.roleName || assignedRole.roleName || '',
