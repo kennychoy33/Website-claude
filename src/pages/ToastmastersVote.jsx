@@ -2150,9 +2150,13 @@ function PersonSelect({ people, personType, personId, onChange, t, disabled = fa
   )
 }
 
-function fullToastmastersRoles(settings, lang = 'zh') {
+function fullToastmastersRoles(_settings, lang = 'zh') {
   const nonRolePattern = /invocation|pledge|guest introduction|word of the day|timer report|ah counter report|grammarian report|awards presentation|president closing/i
   const englishRoles = [
+    { roleName: 'Evaluator 1', time: '3' },
+    { roleName: 'Evaluator 2', time: '3' },
+    { roleName: 'Evaluator 3', time: '3' },
+    { roleName: 'Table Topics Master', time: '20' },
     { roleName: 'Sergeant at Arms', time: '3' },
     { roleName: 'President', time: '5' },
     { roleName: 'Toastmaster of the Evening', time: '5' },
@@ -2161,18 +2165,19 @@ function fullToastmastersRoles(settings, lang = 'zh') {
     { roleName: 'Grammarian', time: '5' },
     { roleName: 'Prepared Speaker 1', time: '7' },
     { roleName: 'Prepared Speaker 2', time: '7' },
-    { roleName: 'Prepared Speaker 3', time: '7' },
-    { roleName: 'Evaluator 1', time: '3' },
-    { roleName: 'Evaluator 2', time: '3' },
-    { roleName: 'Evaluator 3', time: '3' },
-    { roleName: 'Table Topics Master', time: '20' },
     { roleName: 'Table Topics Speaker 1', time: '2' },
     { roleName: 'Table Topics Speaker 2', time: '2' },
     { roleName: 'Table Topics Speaker 3', time: '2' },
     { roleName: 'Table Topics Speaker 4', time: '2' },
     { roleName: 'General Evaluator', time: '10' },
+    { roleName: 'Technical Manager', time: '15' },
+    { roleName: 'Registration and Networking', time: '5' },
   ]
   const chineseRoles = [
+    { roleName: '评论员 1', time: '3' },
+    { roleName: '评论员 2', time: '3' },
+    { roleName: '评论员 3', time: '3' },
+    { roleName: '即席主持人', time: '20' },
     { roleName: '礼宾司', time: '3' },
     { roleName: '会长', time: '5' },
     { roleName: '例会主持人', time: '5' },
@@ -2181,22 +2186,16 @@ function fullToastmastersRoles(settings, lang = 'zh') {
     { roleName: '语言评论员', time: '5' },
     { roleName: '备稿讲员 1', time: '7' },
     { roleName: '备稿讲员 2', time: '7' },
-    { roleName: '备稿讲员 3', time: '7' },
-    { roleName: '评论员 1', time: '3' },
-    { roleName: '评论员 2', time: '3' },
-    { roleName: '评论员 3', time: '3' },
-    { roleName: '即席主持人', time: '20' },
     { roleName: '即席讲员 1', time: '2' },
     { roleName: '即席讲员 2', time: '2' },
     { roleName: '即席讲员 3', time: '2' },
     { roleName: '即席讲员 4', time: '2' },
     { roleName: '总评论', time: '10' },
+    { roleName: '技术经理', time: '15' },
+    { roleName: '登记与交流', time: '5' },
   ]
   const fallbackRoles = lang === 'zh' ? chineseRoles : englishRoles
-  const templateRoles = (settings.agendaRoleTemplate || [])
-    .filter(Boolean)
-    .filter(role => !nonRolePattern.test(typeof role === 'string' ? role : role.roleName || ''))
-  const sourceRoles = templateRoles.length >= 8 ? templateRoles : fallbackRoles
+  const sourceRoles = fallbackRoles.filter(role => !nonRolePattern.test(role.roleName || ''))
   return sourceRoles.map((role, index) => {
     const templateRole = typeof role === 'string' ? { roleName: role, time: '' } : role
     return {
