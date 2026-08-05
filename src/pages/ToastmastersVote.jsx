@@ -3301,7 +3301,6 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
                     )}
                   </Fragment>
                 ))}
-                <tr className="night"><td>{data.meeting.closeTime || '10:00PM'}</td><td colSpan="4">{agendaText.goodNight}</td></tr>
               </tbody>
             </table>
           </div>

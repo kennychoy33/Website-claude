@@ -1871,13 +1871,6 @@
   font-size: 16px;
 }
 
-.tm-agenda-table tr.night td {
-  background: #0f5d99;
-  color: white;
-  font-weight: 900;
-  font-size: 17px;
-}
-
 .tm-agenda-footer {
   text-align: center;
   margin-top: 6px;
@@ -2230,11 +2223,6 @@
   .tm-agenda-table tr.section td {
     font-size: 12pt;
     padding: 1.4mm 2mm;
-  }
-
-  .tm-agenda-table tr.night td {
-    font-size: 13pt;
-    padding: 1.6mm 2mm;
   }
 
   .tm-agenda-footer {
