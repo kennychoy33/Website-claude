@@ -520,6 +520,15 @@ function winner(list, t) {
   return { label: tied ? t.tied : sorted[0].name, votes: sorted[0].votes, tied }
 }
 
+function escapeHtml(value = '') {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 function QrBlock({ value, compact = false }) {
   const [src, setSrc] = useState('')
 
@@ -2210,6 +2219,7 @@ function fullToastmastersRoles(_settings, lang = 'zh') {
 
 function candidatesFromMeetingRoles(roles, people, existingData) {
   const toName = role => personLabel(people, role.personType, role.personId)
+  const existingPreparedByName = new Map((existingData.prepared || []).map(item => [normalizeAgendaText(item.name), item]))
   const toCandidate = (role, prefix, index) => ({
     id: `${prefix}${Date.now()}${index}`,
     name: toName(role),
@@ -2219,8 +2229,8 @@ function candidatesFromMeetingRoles(roles, people, existingData) {
     .filter(role => roleCategory(role.roleName) === 'prepared' && toName(role))
     .map((role, index) => ({
       ...toCandidate(role, 'p', index),
-      title: '',
-      project: '',
+      title: existingPreparedByName.get(normalizeAgendaText(toName(role)))?.title || '',
+      project: existingPreparedByName.get(normalizeAgendaText(toName(role)))?.project || '',
     }))
   const impromptu = roles
     .filter(role => roleCategory(role.roleName) === 'impromptu' && toName(role))
@@ -2929,7 +2939,7 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
     const detailedData = {
       ...syncedData,
       prepared: syncedData.prepared.map((item, index) => {
-        const details = preparedDetails.find(entry => entry.index === index + 1 || entry.name === item.name)
+        const details = preparedDetails.find(entry => entry.index === index + 1 || normalizeAgendaText(entry.name) === normalizeAgendaText(item.name))
         return details
           ? { ...item, title: details.title || item.title, project: details.project || item.project }
           : item
@@ -2958,38 +2968,50 @@ function MeetingView({ data, setData, persistState, people, setPeople, persistPe
     const bi = exportLang === 'bi'
     const label = (zh, english) => bi ? `${zh} / ${english}` : (en ? english : zh)
     const exportRows = standardAgendaScheduleRows(agendaRowsFromTemplate(settings, meetingOps.roles), people, data, exportLang)
-    const rows = [
-      [label('分会名称', 'Club Name'), t.club],
+    const infoRows = [
+      [label('分会名称', 'Club Name'), settings.clubName || t.club],
       ['Toastmaster ID', settings.toastmasterId || ''],
       [label('会议编号', 'Meeting No.'), data.meeting.number || ''],
       [label('日期', 'Date'), data.meeting.date || ''],
       [label('主题', 'Theme'), data.meeting.theme || ''],
       [label('每日一词', 'Word of the Day'), data.meeting.word || ''],
       [label('截止时间', 'Close Time'), data.meeting.closeTime || ''],
-      [],
-      [label('时间', 'Time'), label('摘要 / 题目', 'Agenda / Topic'), label('负责人', 'Person In Charge'), label('时限', 'Time Limit'), label('备注', 'Remark')],
-      ...exportRows.map(item => item.section
-        ? ['', item.section, '', '', '']
-        : [item.time, item.summary, item.person || '', item.duration, '']),
-      [],
-      [label('职务', 'Role'), label('时间/分钟', 'Time / Minutes'), label('人员类型', 'Person Type'), label('负责人', 'Person In Charge')],
-      ...meetingOps.roles.map(item => [localizedRoleName(item.roleName, exportLang), item.time || '', item.personType === 'guest' ? t.guest : t.member, personLabel(people, item.personType, item.personId)]),
-      [],
-      [label('备稿讲员', 'Prepared Speakers'), label('题目', 'Title'), label('项目', 'Project')],
-      ...data.prepared.map(item => [item.name, item.title || '', item.project || '']),
-      [],
-      [label('即席讲员', 'Table Topics Speakers')],
-      ...data.impromptu.map(item => [item.name]),
-      [],
-      [label('评论员', 'Evaluators')],
-      ...data.evaluator.map(item => [item.name]),
     ]
-    const csv = `\uFEFF${rows.map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n')}`
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const tableRow = cells => `<tr>${cells.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`
+    const agendaTableRows = exportRows.map(item => item.section
+      ? `<tr><td colspan="5" class="section">${escapeHtml(item.section)}</td></tr>`
+      : tableRow([item.time, item.summary, item.person || '', item.duration, '']))
+    const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { font-family: "Microsoft JhengHei", Arial, sans-serif; }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { border: 1px solid #2d4f72; padding: 6px; font-size: 12pt; }
+    th { background: #9bb7d7; font-weight: 800; }
+    .title { background: #0f5d99; color: #fff; font-size: 20pt; font-weight: 900; text-align: center; }
+    .section { background: #dbe6f3; font-weight: 900; }
+  </style>
+</head>
+<body>
+  <table>
+    <tr><td colspan="5" class="title">${escapeHtml(`${data.meeting.number || ''} ${label('例常活动议程表', 'Regular Meeting Agenda')}`)}</td></tr>
+    ${infoRows.map(row => `<tr><th>${escapeHtml(row[0])}</th><td colspan="4">${escapeHtml(row[1])}</td></tr>`).join('')}
+    <tr><th>${escapeHtml(label('时间', 'Time'))}</th><th>${escapeHtml(label('摘要 / 题目', 'Agenda / Topic'))}</th><th>${escapeHtml(label('负责人', 'Person In Charge'))}</th><th>${escapeHtml(label('时限', 'Time Limit'))}</th><th>${escapeHtml(label('备注', 'Remark'))}</th></tr>
+    ${agendaTableRows.join('')}
+    <tr><td colspan="5"></td></tr>
+    <tr><th colspan="5">${escapeHtml(label('备稿讲员资料', 'Prepared Speaker Details'))}</th></tr>
+    <tr><th>${escapeHtml(label('备稿讲员', 'Prepared Speaker'))}</th><th colspan="2">${escapeHtml(label('题目', 'Title'))}</th><th colspan="2">${escapeHtml(label('项目', 'Project'))}</th></tr>
+    ${(data.prepared || []).map(item => `<tr><td>${escapeHtml(item.name)}</td><td colspan="2">${escapeHtml(item.title || '')}</td><td colspan="2">${escapeHtml(item.project || '')}</td></tr>`).join('')}
+  </table>
+</body>
+</html>`
+    const blob = new Blob([`\uFEFF${html}`], { type: 'application/vnd.ms-excel;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `${data.meeting.number || 'meeting'}-agenda.csv`
+    link.download = `${data.meeting.number || 'meeting'}-agenda.xls`
     link.click()
     URL.revokeObjectURL(url)
   }
