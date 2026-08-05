@@ -2588,8 +2588,37 @@ function standardAgendaScheduleRows(rows, people, data, lang = 'zh', options = {
     rowFor('exco-report', text('执委及事项报告', 'EXCO / Announcements'), '3', 'toastmaster', toastmasterRole, '9:50PM'),
     rowFor('president-closing', text('会长致休会词', 'President closing address'), '3-5', 'president', presidentRole, '9:53PM'),
   ]
+  const standardFlow = [
+    rowFor('technical', text('技术经理', 'Technical Manager'), '15', 'technical', technicalRole),
+    rowFor('registration', text('登记与交流', 'Registration and networking'), '5', 'registration'),
+    rowFor('sergeant', text('礼宾司致欢迎词', 'Sergeant at Arms welcome'), '3', 'sergeant'),
+    rowFor('president', text('会长致开会词', 'President opening address'), '5', 'president', presidentRole),
+    rowFor('toastmaster', text('司仪介绍节目流程', 'Introduce the meeting program'), '5', 'toastmaster', toastmasterRole),
+    rowFor('timer-briefing', text('计时员说明时间规则', 'Timer explains timing rules'), '3', 'timer', timerRole),
+    rowFor('ah-counter-briefing', text('尾音计算员说明规则', 'Ah Counter explains rules'), '3', 'ah-counter'),
+    rowFor('grammarian', text('语言评论员介绍每日一词', 'Grammarian introduces Word of the Day'), '5', 'grammarian'),
+    { section: text('演说环节', 'Prepared Speeches') },
+    ...printPreparedRows,
+    rowFor('timer-report-1', text('计时报告', 'Timer Report'), '3', 'timer', timerRole),
+    rowFor('topics-master', text('即席主持', 'Table Topics Session'), '20', 'topics-master'),
+    ...(options.compactPrint ? [] : topicsRows),
+    rowFor('timer-report-2', text('计时报告', 'Timer Report'), '3', 'timer', timerRole),
+    rowFor('photo', text('大合照', 'Group Photo'), '5', 'president', presidentRole),
+    rowFor('break', text('交流时间', 'Networking Break'), '5', 'toastmaster', toastmasterRole),
+    { section: text('评论（由总评论承接）', 'Evaluation Session') },
+    ...evaluatorRows,
+    rowFor('topics-evaluation', text('即席评论', 'Table Topics Evaluation'), '10', 'topics-evaluator', topicsEvaluatorRole),
+    rowFor('timer-report-3', text('计时报告', 'Timer Report'), '3', 'timer', timerRole),
+    rowFor('vote', text('投票环节', 'Voting Session'), '5', 'toastmaster', toastmasterRole),
+    rowFor('grammarian-report', text('语言评论', 'Grammarian Report'), '5', 'grammarian'),
+    rowFor('ah-counter-report', text('尾音计算报告', 'Ah Counter Report'), '3', 'ah-counter'),
+    rowFor('general-evaluator', text('总评论', 'General Evaluation'), '10', 'general-evaluator', generalEvaluatorRole),
+    rowFor('awards', text('表扬最佳表现', 'Awards Presentation'), '5', 'toastmaster', toastmasterRole),
+    rowFor('exco-report', text('执委及事项报告', 'EXCO / Announcements'), '5', 'toastmaster', toastmasterRole),
+    rowFor('president-closing', text('会长致休会词', 'President closing address'), '5', 'president', presidentRole),
+  ]
   let current = 19 * 60 + 15
-  return flow.map((item, index) => {
+  return standardFlow.map((item, index) => {
     if (item.section) return { id: `section-${index}`, section: item.section }
     const next = { ...item, time: formatAgendaTime(current) }
     current += minutesFromRoleTime(item.duration)
