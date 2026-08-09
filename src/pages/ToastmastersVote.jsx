@@ -2313,7 +2313,11 @@ function agendaRowsFromTemplate(settings, roles = []) {
   const roleMap = new Map()
   ;(roles || []).forEach(role => {
     const key = canonicalAgendaRoleKey(role.roleName)
-    if (key && !roleMap.has(key)) roleMap.set(key, role)
+    if (!key) return
+    const current = roleMap.get(key)
+    const roleHasData = Boolean(role.personId || role.title || role.project || role.time)
+    const currentHasPerson = Boolean(current?.personId)
+    if (!current || (roleHasData && !currentHasPerson) || (role.personId && !current.personId)) roleMap.set(key, role)
   })
   const template = (settings.agendaRoleTemplate || [])
     .filter(Boolean)
@@ -2339,6 +2343,8 @@ function agendaRowsFromTemplate(settings, roles = []) {
       time: assignedRole.time || templateRole.time || '',
       personType: assignedRole.personType || 'member',
       personId: assignedRole.personId || '',
+      title: assignedRole.title || templateRole.title || '',
+      project: assignedRole.project || templateRole.project || '',
     }
   })
 }
@@ -2375,6 +2381,7 @@ function canonicalAgendaRoleKey(roleName = '') {
 function localizedRoleName(roleName = '', lang = 'zh') {
   const key = canonicalAgendaRoleKey(roleName)
   const zhNames = {
+    registration: '登记与交流',
     sergeant: '礼宾司',
     president: '会长',
     toastmaster: '例会主持人',
@@ -2398,6 +2405,7 @@ function localizedRoleName(roleName = '', lang = 'zh') {
     technical: '技术经理',
   }
   const enNames = {
+    registration: 'Registration and Networking',
     sergeant: 'Sergeant at Arms',
     president: 'President',
     toastmaster: 'Toastmaster of the Evening',
@@ -2427,6 +2435,8 @@ function localizedRoleName(roleName = '', lang = 'zh') {
 
 function agendaRoleOrder(roleName = '') {
   const order = [
+    'technical',
+    'registration',
     'sergeant',
     'president',
     'toastmaster',
@@ -2447,7 +2457,6 @@ function agendaRoleOrder(roleName = '') {
     'evaluator-3',
     'evaluator-4',
     'general-evaluator',
-    'technical',
   ]
   const index = order.indexOf(canonicalAgendaRoleKey(roleName))
   return index >= 0 ? index : order.length + 100
