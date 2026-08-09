@@ -1440,12 +1440,13 @@
 
 .tm-directory-table.members .tm-directory-head,
 .tm-directory-table.members .tm-directory-row {
-  grid-template-columns: 1.1fr 1.1fr 1.3fr .7fr 1.4fr 1fr .8fr 86px;
+  min-width: 1840px;
+  grid-template-columns: .9fr 1fr 1fr 1fr 1.15fr .7fr 1.2fr 1fr 1fr 1.35fr 1fr .9fr .9fr .8fr 86px;
 }
 
 .tm-directory-table.guests .tm-directory-head,
 .tm-directory-table.guests .tm-directory-row {
-  grid-template-columns: 1.1fr 1.4fr 1fr 1fr 1fr 1.6fr 86px;
+  grid-template-columns: 1.1fr 1.4fr 1fr 1fr 1fr 1.6fr 220px;
 }
 
 .tm-directory-head span {
@@ -1476,6 +1477,66 @@
 
 .tm-directory-row button {
   border-radius: 0;
+}
+
+.tm-people-controls {
+  display: grid;
+  gap: 18px;
+}
+
+.tm-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tm-kpi-row div {
+  border: 1px solid var(--tm-line);
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 14px 16px;
+}
+
+.tm-kpi-row b {
+  display: block;
+  color: var(--tm-navy);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.tm-kpi-row span {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+  font-weight: 900;
+}
+
+.tm-filter-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 180px 220px;
+  gap: 12px;
+}
+
+.tm-filter-row input,
+.tm-filter-row select {
+  min-width: 0;
+  border: 1px solid var(--tm-line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font: inherit;
+  font-weight: 800;
+  color: var(--tm-ink);
+  background: white;
+}
+
+.tm-row-actions {
+  display: grid;
+  grid-template-columns: 1.2fr .8fr;
+}
+
+.tm-row-actions button {
+  min-width: 0;
+  border-right: 1px solid var(--tm-line);
 }
 
 .tm-success-card {

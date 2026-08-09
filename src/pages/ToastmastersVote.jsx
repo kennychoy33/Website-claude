@@ -225,6 +225,19 @@ const LANG = {
     introducedBy: '介绍人',
     visitDate: '来访日期',
     notes: '备注',
+    memberId: '会员编号',
+    toastmastersId: 'Toastmasters ID',
+    birthday: '生日',
+    currentProject: '当前项目',
+    mentor: '指导员',
+    officerRole: 'Officer 职务',
+    search: '搜索',
+    allStatus: '全部状态',
+    allPathways: '全部 Pathway',
+    convertToMember: '转会员',
+    memberStats: '会员统计',
+    activeMembers: '活跃会员',
+    guestCount: '嘉宾',
     active: 'Active',
     inactive: 'Inactive',
     importMembers: '从会员资料带入',
@@ -431,6 +444,19 @@ const LANG = {
     introducedBy: 'Introduced By',
     visitDate: 'Visit Date',
     notes: 'Notes',
+    memberId: 'Member ID',
+    toastmastersId: 'Toastmasters ID',
+    birthday: 'Birthday',
+    currentProject: 'Current Project',
+    mentor: 'Mentor',
+    officerRole: 'Officer Role',
+    search: 'Search',
+    allStatus: 'All Status',
+    allPathways: 'All Pathways',
+    convertToMember: 'Convert to Member',
+    memberStats: 'Member Stats',
+    activeMembers: 'Active Members',
+    guestCount: 'Guests',
     active: 'Active',
     inactive: 'Inactive',
     importMembers: 'Import from Members',
@@ -1901,6 +1927,21 @@ function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
   const [importOpen, setImportOpen] = useState(false)
   const [importText, setImportText] = useState('')
   const [actionStatus, setActionStatus] = useState('')
+  const [peopleSearch, setPeopleSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [pathwayFilter, setPathwayFilter] = useState('all')
+  const pathwayOptions = [...new Set(people.members.map(item => item.pathway).filter(Boolean))].sort()
+  const normalizedSearch = normalizePersonName(peopleSearch)
+  const visibleMembers = people.members.filter(item => {
+    const searchable = normalizePersonName([item.name, item.englishName, item.email, item.phone, item.toastmastersId, item.memberId, item.pathway, item.currentProject].filter(Boolean).join(' '))
+    const statusOk = statusFilter === 'all' || (item.status || 'active') === statusFilter
+    const pathwayOk = pathwayFilter === 'all' || item.pathway === pathwayFilter
+    return (!normalizedSearch || searchable.includes(normalizedSearch)) && statusOk && pathwayOk
+  })
+  const visibleGuests = people.guests.filter(item => {
+    const searchable = normalizePersonName([item.name, item.email, item.phone, item.introducedBy, item.notes].filter(Boolean).join(' '))
+    return !normalizedSearch || searchable.includes(normalizedSearch)
+  })
 
   function updateMember(id, field, value) {
     setPeople({
@@ -1923,12 +1964,18 @@ function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
         ...people.members,
         {
           id: `m${Date.now()}`,
+          memberId: '',
           name: '',
           englishName: '',
+          toastmastersId: '',
           email: '',
           phone: '',
           pathway: '',
           level: '',
+          currentProject: '',
+          mentor: '',
+          officerRole: '',
+          birthday: '',
           status: 'active',
           joinedDate: '',
         },
@@ -1960,6 +2007,35 @@ function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
 
   function removeGuest(id) {
     setPeople({ ...people, guests: people.guests.filter(item => item.id !== id) })
+  }
+
+  function convertGuestToMember(guest) {
+    const normalizedName = normalizePersonName(guest.name)
+    if (!normalizedName || people.members.some(item => normalizePersonName(item.name) === normalizedName)) return
+    setPeople({
+      members: [
+        ...people.members,
+        {
+          id: `m${Date.now()}`,
+          memberId: '',
+          name: guest.name || '',
+          englishName: '',
+          toastmastersId: '',
+          email: guest.email || '',
+          phone: guest.phone || '',
+          pathway: '',
+          level: '',
+          currentProject: '',
+          mentor: guest.introducedBy || '',
+          officerRole: '',
+          birthday: '',
+          status: 'active',
+          joinedDate: '',
+          notes: guest.notes || '',
+        },
+      ],
+      guests: people.guests.filter(item => item.id !== guest.id),
+    })
   }
 
   function importChungHwaList() {
@@ -2002,12 +2078,18 @@ function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
         currentMemberNames.add(normalizedName)
         newMembers.push({
           id: `m${Date.now()}${index}`,
+          memberId: item.memberId || '',
           name: item.name,
-          englishName: '',
+          englishName: item.englishName || '',
+          toastmastersId: item.toastmastersId || '',
           email: item.email || '',
           phone: item.phone || '',
-          pathway: '',
-          level: '',
+          pathway: item.pathway || '',
+          level: item.level || '',
+          currentProject: item.currentProject || '',
+          mentor: item.mentor || '',
+          officerRole: item.officerRole || '',
+          birthday: item.birthday || '',
           status: 'active',
           joinedDate: '',
         })
@@ -2048,6 +2130,26 @@ function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
         </div>
       </div>
 
+      <section className="tm-panel tm-people-controls">
+        <div className="tm-kpi-row">
+          <div><b>{people.members.length}</b><span>{t.membersTitle}</span></div>
+          <div><b>{people.members.filter(item => item.status !== 'inactive').length}</b><span>{t.activeMembers}</span></div>
+          <div><b>{people.guests.length}</b><span>{t.guestCount}</span></div>
+        </div>
+        <div className="tm-filter-row">
+          <input value={peopleSearch} onChange={event => setPeopleSearch(event.target.value)} placeholder={t.search} />
+          <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
+            <option value="all">{t.allStatus}</option>
+            <option value="active">{t.active}</option>
+            <option value="inactive">{t.inactive}</option>
+          </select>
+          <select value={pathwayFilter} onChange={event => setPathwayFilter(event.target.value)}>
+            <option value="all">{t.allPathways}</option>
+            {pathwayOptions.map(option => <option key={option} value={option}>{option}</option>)}
+          </select>
+        </div>
+      </section>
+
       {importOpen && (
         <div className="tm-modal-backdrop">
           <div className="tm-modal">
@@ -2075,24 +2177,38 @@ function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
         </div>
         <div className="tm-directory-table members">
           <div className="tm-directory-head">
+            <span>{t.memberId}</span>
             <span>{t.name}</span>
             <span>{t.englishName}</span>
+            <span>{t.toastmastersId}</span>
             <span>{t.pathway}</span>
             <span>{t.level}</span>
+            <span>{t.currentProject}</span>
+            <span>{t.mentor}</span>
+            <span>{t.officerRole}</span>
             <span>{t.email}</span>
             <span>{t.phone}</span>
+            <span>{t.joinedDate}</span>
+            <span>{t.birthday}</span>
             <span>{t.status}</span>
             <span>{t.action}</span>
           </div>
-          {people.members.map(item => (
+          {visibleMembers.map(item => (
             <div className="tm-directory-row" key={item.id}>
-              <input value={item.name} onChange={e => updateMember(item.id, 'name', e.target.value)} />
-              <input value={item.englishName} onChange={e => updateMember(item.id, 'englishName', e.target.value)} />
-              <input value={item.pathway} onChange={e => updateMember(item.id, 'pathway', e.target.value)} />
-              <input value={item.level} onChange={e => updateMember(item.id, 'level', e.target.value)} />
-              <input value={item.email} onChange={e => updateMember(item.id, 'email', e.target.value)} />
-              <input value={item.phone} onChange={e => updateMember(item.id, 'phone', e.target.value)} />
-              <select value={item.status} onChange={e => updateMember(item.id, 'status', e.target.value)}>
+              <input value={item.memberId || ''} onChange={e => updateMember(item.id, 'memberId', e.target.value)} />
+              <input value={item.name || ''} onChange={e => updateMember(item.id, 'name', e.target.value)} />
+              <input value={item.englishName || ''} onChange={e => updateMember(item.id, 'englishName', e.target.value)} />
+              <input value={item.toastmastersId || ''} onChange={e => updateMember(item.id, 'toastmastersId', e.target.value)} />
+              <input value={item.pathway || ''} onChange={e => updateMember(item.id, 'pathway', e.target.value)} />
+              <input value={item.level || ''} onChange={e => updateMember(item.id, 'level', e.target.value)} />
+              <input value={item.currentProject || ''} onChange={e => updateMember(item.id, 'currentProject', e.target.value)} />
+              <input value={item.mentor || ''} onChange={e => updateMember(item.id, 'mentor', e.target.value)} />
+              <input value={item.officerRole || ''} onChange={e => updateMember(item.id, 'officerRole', e.target.value)} />
+              <input value={item.email || ''} onChange={e => updateMember(item.id, 'email', e.target.value)} />
+              <input value={item.phone || ''} onChange={e => updateMember(item.id, 'phone', e.target.value)} />
+              <input value={item.joinedDate || ''} onChange={e => updateMember(item.id, 'joinedDate', e.target.value)} />
+              <input value={item.birthday || ''} onChange={e => updateMember(item.id, 'birthday', e.target.value)} />
+              <select value={item.status || 'active'} onChange={e => updateMember(item.id, 'status', e.target.value)}>
                 <option value="active">{t.active}</option>
                 <option value="inactive">{t.inactive}</option>
               </select>
@@ -2117,15 +2233,18 @@ function PeopleView({ people, setPeople, persistPeople, syncStatus, t }) {
             <span>{t.notes}</span>
             <span>{t.action}</span>
           </div>
-          {people.guests.map(item => (
+          {visibleGuests.map(item => (
             <div className="tm-directory-row" key={item.id}>
-              <input value={item.name} onChange={e => updateGuest(item.id, 'name', e.target.value)} />
-              <input value={item.email} onChange={e => updateGuest(item.id, 'email', e.target.value)} />
-              <input value={item.phone} onChange={e => updateGuest(item.id, 'phone', e.target.value)} />
-              <input value={item.introducedBy} onChange={e => updateGuest(item.id, 'introducedBy', e.target.value)} />
-              <input value={item.visitDate} onChange={e => updateGuest(item.id, 'visitDate', e.target.value)} />
-              <input value={item.notes} onChange={e => updateGuest(item.id, 'notes', e.target.value)} />
-              <button className="tm-danger" onClick={() => removeGuest(item.id)}>{t.remove}</button>
+              <input value={item.name || ''} onChange={e => updateGuest(item.id, 'name', e.target.value)} />
+              <input value={item.email || ''} onChange={e => updateGuest(item.id, 'email', e.target.value)} />
+              <input value={item.phone || ''} onChange={e => updateGuest(item.id, 'phone', e.target.value)} />
+              <input value={item.introducedBy || ''} onChange={e => updateGuest(item.id, 'introducedBy', e.target.value)} />
+              <input value={item.visitDate || ''} onChange={e => updateGuest(item.id, 'visitDate', e.target.value)} />
+              <input value={item.notes || ''} onChange={e => updateGuest(item.id, 'notes', e.target.value)} />
+              <div className="tm-row-actions">
+                <button onClick={() => convertGuestToMember(item)}>{t.convertToMember}</button>
+                <button className="tm-danger" onClick={() => removeGuest(item.id)}>{t.remove}</button>
+              </div>
             </div>
           ))}
         </div>
@@ -2167,6 +2286,10 @@ function parsePeoplePaste(text = '') {
     if (!withoutNumber) return
     const email = withoutNumber.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || ''
     const phone = withoutNumber.match(/(?:\+?6?0|01)\d[\d -]{6,}/)?.[0]?.trim() || ''
+    const toastmastersId = withoutNumber.match(/\b(?:tm|toastmasters?)\s*id\s*[:：]?\s*([A-Z0-9-]+)/i)?.[1] || ''
+    const pathway = withoutNumber.match(/\b(?:pathway|pathways?)\s*[:：]?\s*([^,，|]+)/i)?.[1]?.trim() || ''
+    const levelRaw = withoutNumber.match(/\b(?:level|lvl|l)\s*[:：]?\s*([1-5]|L[1-5])\b/i)?.[1] || ''
+    const level = levelRaw ? String(levelRaw).toUpperCase().replace(/^([1-5])$/, 'L$1') : ''
     const guestLike = /嘉宾|嘉賓|来宾|來賓|guest|visitor|来访|來訪|rm\s*\d+|✅/i.test(withoutNumber)
     const memberLike = /会员|會員|member|free|免费|免費|🆓/i.test(withoutNumber)
     const type = guestLike && !memberLike ? 'guest' : 'member'
@@ -2181,6 +2304,9 @@ function parsePeoplePaste(text = '') {
       name,
       email,
       phone,
+      toastmastersId,
+      pathway,
+      level,
       notes: type === 'guest' ? withoutNumber : '',
     })
   })
