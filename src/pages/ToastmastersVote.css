@@ -1607,7 +1607,7 @@
 .tm-role-head,
 .tm-role-row {
   display: grid;
-  grid-template-columns: 1.1fr 110px 1.5fr 96px;
+  grid-template-columns: minmax(180px, 1.05fr) 96px minmax(220px, 1.15fr) minmax(260px, 1.45fr) 96px;
 }
 
 .tm-role-head span {
@@ -1633,6 +1633,28 @@
   font: inherit;
   font-weight: 800;
   color: var(--tm-ink);
+  background: white;
+}
+
+.tm-role-details {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  border-right: 1px solid var(--tm-line);
+  background: var(--tm-line);
+}
+
+.tm-role-details input {
+  border-right: 0;
+}
+
+.tm-role-empty {
+  display: flex;
+  align-items: center;
+  min-height: 100%;
+  padding: 11px 12px;
+  color: #8a98aa;
+  font-weight: 900;
   background: white;
 }
 
@@ -2312,22 +2334,7 @@
   }
 
   .tm-agenda-purpose {
-    display: block !important;
-    grid-template-columns: none !important;
-    padding: 1.2mm 2.2mm;
-    font-size: 10.8pt;
-    line-height: 1.16;
-  }
-
-  .tm-agenda-purpose div {
-    display: block !important;
-    width: 100% !important;
-    max-width: none !important;
-    white-space: normal;
-  }
-
-  .tm-agenda-purpose b {
-    font-size: 11pt;
+    display: none !important;
   }
 
   .tm-agenda-title-bar {
